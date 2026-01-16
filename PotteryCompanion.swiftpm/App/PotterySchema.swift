@@ -37,12 +37,14 @@ final class PotteryPhoto {
     var id: UUID
     var imageData: Data
     var stageTag: String // e.g., "Greenware", "Bone Dry", "Bisque", "Glazed", "Finished"
+    var note: String
     var dateAdded: Date
     
-    init(imageData: Data, stageTag: String = "Finished") {
+    init(imageData: Data, stageTag: String = "Finished", note: String = "") {
         self.id = UUID()
         self.imageData = imageData
         self.stageTag = stageTag
+        self.note = note
         self.dateAdded = .now
     }
 }

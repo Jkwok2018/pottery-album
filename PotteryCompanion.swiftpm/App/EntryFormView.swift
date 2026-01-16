@@ -179,8 +179,8 @@ struct EntryFormView: View {
             }
         }
         .sheet(item: $pendingPhoto) { draft in
-            PhotoMetadataView(imageData: draft.data) { tag in
-                let newPhoto = PotteryPhoto(imageData: draft.data, stageTag: tag)
+            PhotoMetadataView(imageData: draft.data) { tag, note in
+                let newPhoto = PotteryPhoto(imageData: draft.data, stageTag: tag, note: note)
                 if let entry = entry {
                     // If editing existing, add directly
                     entry.photos.append(newPhoto)
@@ -188,6 +188,8 @@ struct EntryFormView: View {
                     // If new, add to temp
                     temporaryPhotos.append(newPhoto)
                 }
+                selectedItem = nil
+                pendingPhoto = nil
             }
         }
         .alert("Save Failed", isPresented: $showingError, actions: {
@@ -232,6 +234,7 @@ struct EntryFormView: View {
             try modelContext.save()
             dismiss()
         } catch {
+            print("Error saving entry: \(error)")
             saveError = error
             showingError = true
         }

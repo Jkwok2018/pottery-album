@@ -19,13 +19,21 @@ struct EntryDetailView: View {
                                     .frame(maxWidth: .infinity)
                                     .clipped()
                                     .overlay(alignment: .bottomLeading) {
-                                        Text(photo.stageTag)
-                                            .font(.caption.bold())
-                                            .foregroundStyle(.white)
-                                            .padding(6)
-                                            .background(.black.opacity(0.6))
-                                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                                            .padding(16)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(photo.stageTag)
+                                                .font(.caption.bold())
+                                                .foregroundStyle(.white)
+                                            
+                                            if !photo.note.isEmpty {
+                                                Text(photo.note)
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.white.opacity(0.9))
+                                            }
+                                        }
+                                        .padding(8)
+                                        .background(.black.opacity(0.6))
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        .padding(16)
                                     }
                             }
                         }

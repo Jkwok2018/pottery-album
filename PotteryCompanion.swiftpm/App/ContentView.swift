@@ -6,44 +6,101 @@ struct ContentView: View {
     @Query(sort: \PotteryEntry.date, order: .reverse) private var entries: [PotteryEntry]
     
     @State private var showingAddSheet = false
+    @State private var showingFilterSheet = false
     @State private var searchText = ""
+    @State private var filterConfig = FilterConfig()
 
     var filteredEntries: [PotteryEntry] {
-        if searchText.isEmpty {
-            return entries
-        } else {
-            return entries.filter { $0.name.localizedCaseInsensitiveContains(searchText) || $0.clayType.localizedCaseInsensitiveContains(searchText) }
+        var result = entries
+        
+        // 1. Text Search
+        if !searchText.isEmpty {
+            result = result.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                // 1b. Search tags (keeping this as it's useful for "Greenware" etc)
+                $0.photos.contains { photo in photo.stageTag.localizedCaseInsensitiveContains(searchText) }
+            }
         }
+        
+        // 2. Filter by Clay Type
+        if let clay = filterConfig.selectedClayType {
+            result = result.filter { $0.clayType == clay }
+        }
+        
+        // 3. Filter by Shape
+        if let shape = filterConfig.selectedShape {
+            result = result.filter { $0.shape == shape }
+        }
+        
+        // 4. Filter by Weight
+        if filterConfig.minWeight > 0 {
+            result = result.filter { ($0.clayWeight ?? 0) >= filterConfig.minWeight }
+        }
+        
+        return result
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(filteredEntries) { entry in
-                        NavigationLink(destination: EntryDetailView(entry: entry)) {
-                            PotteryCardView(entry: entry)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                modelContext.delete(entry)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                // Custom Search & Filter Header
+                HStack(spacing: 12) {
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField("Search names...", text: $searchText)
+                    }
+                    .padding(10)
+                    .background(Color(uiColor: .systemGray5))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    
+                    Button(action: { showingFilterSheet = true }) {
+                        Image(systemName: filterConfig.isActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(filterConfig.isActive ? Color.accentColor : Color.primary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 16)
+                
+                if filteredEntries.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                        .padding(.top, 40)
+                } else {
+                    LazyVStack(spacing: 16) {
+                        ForEach(filteredEntries) { entry in
+                            NavigationLink(destination: EntryDetailView(entry: entry)) {
+                                PotteryCardView(entry: entry)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    modelContext.delete(entry)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
                         }
                     }
+                    .padding()
                 }
-                .padding()
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Pottery Log")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Text("\(entries.count) items")
+                    // Reset button still useful in toolbar, or move to sheet? 
+                    // Let's keep a small indicator/reset if active, it's helpful.
+                    if filterConfig.isActive {
+                        Button("Reset") {
+                            withAnimation {
+                                filterConfig = FilterConfig()
+                            }
+                        }
                         .font(.caption)
-                        .foregroundStyle(.red)
+                    }
                 }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddSheet = true }) {
                         Image(systemName: "plus.circle.fill")
@@ -55,7 +112,89 @@ struct ContentView: View {
             .sheet(isPresented: $showingAddSheet) {
                 NavigationStack {
                     EntryFormView(entry: nil)
+                        .modelContext(modelContext)
                 }
+            }
+            .sheet(isPresented: $showingFilterSheet) {
+                NavigationStack {
+                    FilterSheet(config: $filterConfig, entries: entries)
+                }
+                .presentationDetents([.medium])
+            }
+        }
+    }
+}
+
+struct FilterConfig: Equatable {
+    var selectedClayType: String?
+    var selectedShape: String?
+    var minWeight: Double = 0
+    
+    var isActive: Bool {
+        selectedClayType != nil || selectedShape != nil || minWeight > 0
+    }
+}
+
+struct FilterSheet: View {
+    @Binding var config: FilterConfig
+    let entries: [PotteryEntry]
+    @Environment(\.dismiss) private var dismiss
+    
+    var uniqueClayTypes: [String] {
+        Array(Set(entries.map { $0.clayType })).filter { !$0.isEmpty }.sorted()
+    }
+    
+    var uniqueShapes: [String] {
+        Array(Set(entries.map { $0.shape })).filter { !$0.isEmpty }.sorted()
+    }
+    
+    var maxWeightFound: Double {
+        entries.compactMap { $0.clayWeight }.max() ?? 10.0
+    }
+    
+    var body: some View {
+        Form {
+            Section("Criteria") {
+                Picker("Clay Type", selection: $config.selectedClayType) {
+                    Text("Any").tag(Optional<String>.none)
+                    ForEach(uniqueClayTypes, id: \.self) { type in
+                        Text(type).tag(Optional(type))
+                    }
+                }
+                .pickerStyle(.menu)
+                
+                Picker("Shape", selection: $config.selectedShape) {
+                    Text("Any").tag(Optional<String>.none)
+                    ForEach(uniqueShapes, id: \.self) { shape in
+                        Text(shape).tag(Optional(shape))
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+            
+            Section("Minimum Weight: \(String(format: "%.1f", config.minWeight)) lbs") {
+                Slider(value: $config.minWeight, in: 0...max(5, maxWeightFound), step: 0.5) {
+                    Text("Weight")
+                } minimumValueLabel: {
+                    Text("0")
+                } maximumValueLabel: {
+                    Text("\(Int(max(5, maxWeightFound)))")
+                }
+            }
+            
+            Section {
+                Button("Clear All Filters", role: .destructive) {
+                    config = FilterConfig()
+                    dismiss()
+                }
+                .disabled(!config.isActive)
+            }
+        }
+        .navigationTitle("Filter Entries")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
             }
         }
     }
