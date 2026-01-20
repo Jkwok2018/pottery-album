@@ -37,6 +37,11 @@ struct ContentView: View {
             result = result.filter { ($0.clayWeight ?? 0) >= filterConfig.minWeight }
         }
         
+        // 5. Filter by Status
+        if let status = filterConfig.selectedStatus {
+            result = result.filter { $0.status == status }
+        }
+        
         return result
     }
 
@@ -128,10 +133,11 @@ struct ContentView: View {
 struct FilterConfig: Equatable {
     var selectedClayType: String?
     var selectedShape: String?
+    var selectedStatus: String?
     var minWeight: Double = 0
     
     var isActive: Bool {
-        selectedClayType != nil || selectedShape != nil || minWeight > 0
+        selectedClayType != nil || selectedShape != nil || selectedStatus != nil || minWeight > 0
     }
 }
 
@@ -155,6 +161,14 @@ struct FilterSheet: View {
     var body: some View {
         Form {
             Section("Criteria") {
+                Picker("Status", selection: $config.selectedStatus) {
+                    Text("Any").tag(Optional<String>.none)
+                    Text("In Progress").tag(Optional("In Progress"))
+                    Text("Completed").tag(Optional("Completed"))
+                    Text("Stopped").tag(Optional("Stopped"))
+                }
+                .pickerStyle(.menu)
+
                 Picker("Clay Type", selection: $config.selectedClayType) {
                     Text("Any").tag(Optional<String>.none)
                     ForEach(uniqueClayTypes, id: \.self) { type in
@@ -226,9 +240,22 @@ struct PotteryCardView: View {
             
             // Content
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.name.isEmpty ? "Untitled Piece" : entry.name)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+                HStack {
+                    Text(entry.name.isEmpty ? "Untitled Piece" : entry.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    
+                    Spacer()
+                    
+                    // Status Badge
+                    Text(entry.status)
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(statusColor(for: entry.status).opacity(0.1))
+                        .foregroundStyle(statusColor(for: entry.status))
+                        .clipShape(Capsule())
+                }
                 
                 Text(entry.date.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)
@@ -256,5 +283,14 @@ struct PotteryCardView: View {
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+    
+    private func statusColor(for status: String) -> Color {
+        switch status {
+        case "In Progress": return .orange
+        case "Completed": return .green
+        case "Stopped": return .secondary
+        default: return .blue
+        }
     }
 }

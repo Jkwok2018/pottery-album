@@ -16,6 +16,7 @@ final class PotteryEntry {
     // Dimensions
     // Shape
     var shape: String
+    var status: String // "In Progress", "Completed", "Stopped"
     
     @Relationship(deleteRule: .cascade) var photos: [PotteryPhoto] = []
     
@@ -29,6 +30,7 @@ final class PotteryEntry {
         self.glazes = ""
         self.notes = ""
         self.shape = ""
+        self.status = "In Progress"
     }
 }
 

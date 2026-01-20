@@ -17,7 +17,7 @@ let package = Package(
             name: "PotteryCompanion",
             targets: ["AppModule"],
             bundleIdentifier: "com.example.potterycompanion",
-            teamIdentifier: nil,
+            teamIdentifier: "5SQZ53CYMT",
             displayVersion: "1.0",
             bundleVersion: "1",
             appIcon: .placeholder(icon: .images),

@@ -20,6 +20,7 @@ struct EntryFormView: View {
     @State private var glazes: String = ""
     @State private var notes: String = ""
     @State private var shape: String = ""
+    @State private var status: String = "In Progress"
     
     // Photo State
     @State private var selectedItem: PhotosPickerItem?
@@ -43,6 +44,12 @@ struct EntryFormView: View {
             Section("General Info") {
                 TextField("Title (e.g., Blue Bowl)", text: $name)
                 DatePicker("Date Created", selection: $date, displayedComponents: .date)
+                
+                Picker("Status", selection: $status) {
+                    Text("In Progress").tag("In Progress")
+                    Text("Completed").tag("Completed")
+                    Text("Stopped").tag("Stopped")
+                }
             }
             
             Section("Specs") {
@@ -176,6 +183,7 @@ struct EntryFormView: View {
                 glazes = entry.glazes
                 notes = entry.notes
                 shape = entry.shape
+                status = entry.status
             }
         }
         .sheet(item: $pendingPhoto) { draft in
@@ -219,6 +227,7 @@ struct EntryFormView: View {
                 entry.glazes = glazes
                 entry.notes = notes
                 entry.shape = shape
+                entry.status = status
             } else {
                 // Create new
                 let newEntry = PotteryEntry(name: name, date: date)
@@ -228,6 +237,7 @@ struct EntryFormView: View {
                 newEntry.glazes = glazes
                 newEntry.notes = notes
                 newEntry.shape = shape
+                newEntry.status = status
                 newEntry.photos = temporaryPhotos
                 modelContext.insert(newEntry)
             }
