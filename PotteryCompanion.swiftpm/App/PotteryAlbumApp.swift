@@ -33,6 +33,7 @@ struct PotteryAlbumApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .tint(Color.primary)
         }
         .modelContainer(container)
     }

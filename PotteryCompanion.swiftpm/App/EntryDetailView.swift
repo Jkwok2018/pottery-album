@@ -1,133 +1,168 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct EntryDetailView: View {
     @Bindable var entry: PotteryEntry
     @State private var isEditing = false
+    @State private var selectedPhoto: PotteryPhoto?
+    @State private var selectedItem: PhotosUI.PhotosPickerItem?
+    @State private var pendingPhoto: EntryFormView.PhotoDraft?
+    
+    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // Hero Image or Gallery
-                if !entry.photos.isEmpty {
-                    TabView {
-                        ForEach(entry.photos) { photo in
-                            if let uiImage = UIImage(data: photo.imageData) {
-                                ZStack {
-                                    Color(uiColor: .secondarySystemBackground)
-                                    
-                                    Image(uiImage: uiImage)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .clipped()
-                                .overlay(alignment: .bottomLeading) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(photo.stageTag)
-                                            .font(.caption.bold())
-                                            .foregroundStyle(.white)
-                                        
-                                        if !photo.note.isEmpty {
-                                            Text(photo.note)
-                                                .font(.caption2)
-                                                .foregroundStyle(.white.opacity(0.9))
-                                        }
-                                    }
-                                    .padding(8)
-                                    .background(.black.opacity(0.6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                                    .padding(16)
-                                }
-                            }
-                        }
+            VStack(alignment: .leading, spacing: 20) {
+                // Top Header (Name & Date)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.name)
+                        .font(.system(size: 34, weight: .bold, design: .serif))
+                        .foregroundStyle(.primary)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .font(.subheadline)
+                        Text(entry.date.formatted(date: .long, time: .omitted))
+                            .font(.subheadline)
                     }
-                    .tabViewStyle(.page)
-                    .frame(height: 350)
-                } else {
-                    Rectangle()
-                        .fill(Color(uiColor: .secondarySystemBackground))
-                        .frame(height: 200)
-                        .overlay {
-                            VStack(spacing: 8) {
-                                Image(systemName: "camera")
-                                    .font(.largeTitle)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                
+                // Photo Gallery Container
+                VStack(alignment: .leading, spacing: 16) {
+                    // Main Photo Display
+                    ZStack {
+                        Color(uiColor: .systemBackground)
+                        
+                        if let photo = selectedPhoto ?? entry.photos.first,
+                           let uiImage = UIImage(data: photo.imageData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFit()
+                        } else {
+                            VStack(spacing: 12) {
+                                Image(systemName: "photo.on.rectangle.angled")
+                                    .font(.system(size: 60))
                                     .foregroundStyle(.tertiary)
-                                Text("No Photos")
+                                Text("No Photos Yet")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                         }
-                }
-                
-                VStack(alignment: .leading, spacing: 24) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(entry.name)
-                            .font(.system(size: 32, weight: .bold, design: .serif)) // Premium font choice
-                            .foregroundStyle(.primary)
-                        
-                        Text(entry.date.formatted(date: .long, time: .omitted))
-                            .font(.body)
-                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 320)
+                    .background(Color(uiColor: .systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                     
-                    Divider()
-                    
-                    // Key Specs
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Specifications")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                        
-                        HStack(spacing: 20) {
-                            SpecCard(title: "Clay", value: entry.clayType, icon: "cube.fill")
-                            SpecCard(title: "Firing", value: entry.firingMethod, icon: "flame.fill")
-                        }
-                    }
-                    
-                    // Detailed Grid
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], alignment: .leading, spacing: 20) {
-                        // Safely unwrap optional values or default to nil for the helper function to decide logic
-                        if let weight = entry.clayWeight, weight > 0 {
-                            DetailItem(label: "Weight", value: "\(String(format: "%.1f", weight)) lbs")
-                        } else {
-                            DetailItem(label: "Weight", value: "-")
-                        }
-                        
-                        DetailItem(label: "Glazes", value: entry.glazes)
-                        
-                        DetailItem(label: "Shape", value: entry.shape.isEmpty ? "-" : entry.shape)
-                    }
-                    .padding(.vertical)
-                    .background(Color(uiColor: .secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.vertical, 8)
-
-                    
-                    // Notes
-                    if !entry.notes.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Notes")
-                                .font(.headline)
+                    // Photo Notes/Caption
+                    if let photo = selectedPhoto ?? entry.photos.first {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "quote.bubble")
                                 .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                            
-                            Text(entry.notes)
-                                .font(.body)
-                                .lineSpacing(4)
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color(uiColor: .yellow).opacity(0.1)) // Subtle note paper feel
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            Text(photo.note.isEmpty ? photo.stageTag : "\(photo.stageTag): \(photo.note)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .italic()
                         }
+                        .padding(.horizontal, 8)
+                    }
+                    
+                    // Thumbnail Bar
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            // Existing Photos
+                            ForEach(entry.photos) { photo in
+                                Button {
+                                    selectedPhoto = photo
+                                } label: {
+                                    if let uiImage = UIImage(data: photo.imageData) {
+                                        Image(uiImage: uiImage)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 55, height: 55)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(selectedPhoto == photo || (selectedPhoto == nil && photo == entry.photos.first) ? Color.primary : Color.clear, lineWidth: 2)
+                                            )
+                                    }
+                                }
+                            }
+                            
+                            // Add Photo Button
+                            PhotosPicker(selection: $selectedItem, matching: .images) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color(uiColor: .tertiarySystemBackground))
+                                        .frame(width: 55, height: 55)
+                                    Image(systemName: "plus")
+                                        .font(.title3)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 4)
                     }
                 }
-                .padding(20)
+                .padding(16)
+                .background(Color(uiColor: .systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .padding(.horizontal, 16)
+                
+                // Details Section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("DETAILS")
+                        .font(.footnote).bold()
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 8)
+                    
+                    VStack(spacing: 0) {
+                        DetailRow(label: "Type", value: entry.shape)
+                        Divider().padding(.horizontal)
+                        DetailRow(label: "Status", value: entry.status)
+                        Divider().padding(.horizontal)
+                        DetailRow(label: "Clay", value: entry.clayType)
+                        Divider().padding(.horizontal)
+                        DetailRow(label: "Glaze", value: entry.glazes)
+                        Divider().padding(.horizontal)
+                        DetailRow(label: "Firing", value: entry.firingMethod)
+                        if let weight = entry.clayWeight {
+                            Divider().padding(.horizontal)
+                            DetailRow(label: "Weight", value: "\(String(format: "%.1f", weight)) lbs")
+                        }
+                    }
+                    .background(Color(uiColor: .systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal, 20)
+                
+                // Notes Section
+                if !entry.notes.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("NOTES")
+                            .font(.footnote).bold()
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 8)
+                        
+                        Text(entry.notes)
+                            .font(.body)
+                            .lineSpacing(4)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(uiColor: .systemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.horizontal, 20)
+                }
             }
+            .padding(.bottom, 40)
         }
-        .navigationTitle(entry.name)
+        .background(Color.appBackground)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             Button("Edit") {
@@ -137,48 +172,35 @@ struct EntryDetailView: View {
         .sheet(isPresented: $isEditing) {
             EntryFormView(entry: entry)
         }
-    }
-}
-
-struct SpecCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(.tint)
-                .frame(width: 40, height: 40)
-                .background(Color.accentColor.opacity(0.1))
-                .clipShape(Circle())
-            
-            VStack(alignment: .leading) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value.isEmpty ? "-" : value)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+        .navigationDestination(item: $pendingPhoto) { draft in
+            PhotoMetadataView(item: draft.item) { data, tag, note in
+                let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note)
+                entry.photos.append(newPhoto)
+                selectedPhoto = newPhoto
+                selectedItem = nil
+                pendingPhoto = nil
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .onChange(of: selectedItem) { oldValue, newValue in
+            if let newValue = newValue {
+                pendingPhoto = EntryFormView.PhotoDraft(item: newValue)
+            }
+        }
     }
 }
 
-struct DetailItem: View {
+struct DetailRow: View {
     let label: String
     let value: String
     
     var body: some View {
-        VStack(alignment: .leading) {
+        HStack {
             Text(label)
-                .font(.caption)
                 .foregroundStyle(.secondary)
+            Spacer()
             Text(value.isEmpty ? "-" : value)
-                .font(.body)
                 .fontWeight(.medium)
         }
+        .padding()
     }
 }

@@ -56,13 +56,14 @@ struct ContentView: View {
                         TextField("Search names...", text: $searchText)
                     }
                     .padding(10)
-                    .background(Color(uiColor: .systemGray5))
+                    .background(Color.appBackground)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
                     
                     Button(action: { showingFilterSheet = true }) {
                         Image(systemName: filterConfig.isActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                             .font(.system(size: 22))
-                            .foregroundStyle(filterConfig.isActive ? Color.accentColor : Color.primary)
+                            .foregroundStyle(.primary)
                     }
                 }
                 .padding(.horizontal)
@@ -90,7 +91,7 @@ struct ContentView: View {
                     .padding()
                 }
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color.appBackground)
             .navigationTitle("Pottery Log")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -253,20 +254,20 @@ struct PotteryCardView: View {
                         .background(statusColor(for: entry.status).opacity(0.1))
                         .foregroundStyle(statusColor(for: entry.status))
                         .clipShape(Capsule())
+                        .font(.footnote).bold()
                 }
                 
                 Text(entry.date.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                 
                 if !entry.clayType.isEmpty {
                     Text(entry.clayType)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
+                        .font(.footnote).fontWeight(.semibold)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.accentColor.opacity(0.1))
-                        .foregroundStyle(Color.accentColor)
+                        .background(Color.primary.opacity(0.1))
+                        .foregroundStyle(Color.primary)
                         .clipShape(Capsule())
                         .padding(.top, 4)
                 }

@@ -92,7 +92,7 @@ struct EntryFormView: View {
     @ViewBuilder
     private var formContent: some View {
         Form {
-            Section("General Info") {
+            Section {
                 TextField("Title (e.g., Blue Bowl)", text: $name)
                 DatePicker("Date Created", selection: $date, displayedComponents: .date)
                 
@@ -101,9 +101,11 @@ struct EntryFormView: View {
                     Text("Completed").tag("Completed")
                     Text("Stopped").tag("Stopped")
                 }
+            } header: {
+                Text("General Info").font(.footnote).bold().foregroundStyle(.secondary)
             }
             
-            Section("Specs") {
+            Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Picker("Clay Type", selection: Binding(
                         get: { uniqueClayTypes.contains(clayType) ? clayType : "Other" },
@@ -153,16 +155,20 @@ struct EntryFormView: View {
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
                 }
+            } header: {
+                Text("Specs").font(.footnote).bold().foregroundStyle(.secondary)
             }
             
-            Section("Process") {
+            Section {
                 TextField("Firing Method (e.g. Cone 6 Electric)", text: $firingMethod)
                 TextField("Glazes Used", text: $glazes)
                 TextField("Notes", text: $notes, axis: .vertical)
                     .lineLimit(3...6)
+            } header: {
+                Text("Process").font(.footnote).bold().foregroundStyle(.secondary)
             }
             
-            Section("Photos") {
+            Section {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         if let entry = entry {
@@ -204,8 +210,12 @@ struct EntryFormView: View {
                     .padding(.vertical, 8)
                 }
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            } header: {
+                Text("Photos").font(.footnote).bold().foregroundStyle(.secondary)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.appBackground)
     }
 
     struct PhotoDraft: Identifiable, Hashable {

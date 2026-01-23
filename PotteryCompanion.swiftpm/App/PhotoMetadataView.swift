@@ -32,7 +32,7 @@ struct PhotoMetadataView: View {
                 }
             }
             
-            Section("Details") {
+            Section {
                 Picker("Stage", selection: $selectedTag) {
                     ForEach(tags, id: \.self) { tag in
                         Text(tag).tag(tag)
@@ -41,6 +41,8 @@ struct PhotoMetadataView: View {
                 
                 TextField("Add a note...", text: $note)
                     .disabled(imageData == nil)
+            } header: {
+                Text("Details").font(.footnote).bold().foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Tag Photo")
