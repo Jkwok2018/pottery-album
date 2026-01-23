@@ -38,7 +38,7 @@ final class PotteryEntry {
 final class PotteryPhoto {
     var id: UUID
     var imageData: Data
-    var stageTag: String // e.g., "Greenware", "Bone Dry", "Bisque", "Glazed", "Finished"
+    var stageTag: String // e.g., "Greenware"
     var note: String
     var dateAdded: Date
     

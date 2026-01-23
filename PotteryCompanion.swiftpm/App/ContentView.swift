@@ -115,10 +115,8 @@ struct ContentView: View {
                 }
             }
             .sheet(isPresented: $showingAddSheet) {
-                NavigationStack {
-                    EntryFormView(entry: nil)
-                        .modelContext(modelContext)
-                }
+                EntryFormView(entry: nil)
+                    .modelContext(modelContext)
             }
             .sheet(isPresented: $showingFilterSheet) {
                 NavigationStack {

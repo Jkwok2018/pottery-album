@@ -13,28 +13,32 @@ struct EntryDetailView: View {
                     TabView {
                         ForEach(entry.photos) { photo in
                             if let uiImage = UIImage(data: photo.imageData) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxWidth: .infinity)
-                                    .clipped()
-                                    .overlay(alignment: .bottomLeading) {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(photo.stageTag)
-                                                .font(.caption.bold())
-                                                .foregroundStyle(.white)
-                                            
-                                            if !photo.note.isEmpty {
-                                                Text(photo.note)
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.white.opacity(0.9))
-                                            }
+                                ZStack {
+                                    Color(uiColor: .secondarySystemBackground)
+                                    
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .clipped()
+                                .overlay(alignment: .bottomLeading) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(photo.stageTag)
+                                            .font(.caption.bold())
+                                            .foregroundStyle(.white)
+                                        
+                                        if !photo.note.isEmpty {
+                                            Text(photo.note)
+                                                .font(.caption2)
+                                                .foregroundStyle(.white.opacity(0.9))
                                         }
-                                        .padding(8)
-                                        .background(.black.opacity(0.6))
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                                        .padding(16)
                                     }
+                                    .padding(8)
+                                    .background(.black.opacity(0.6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    .padding(16)
+                                }
                             }
                         }
                     }
@@ -123,7 +127,7 @@ struct EntryDetailView: View {
                 .padding(20)
             }
         }
-        .ignoresSafeArea(edges: entry.photos.isEmpty ? [] : .top)
+        .navigationTitle(entry.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             Button("Edit") {
@@ -131,9 +135,7 @@ struct EntryDetailView: View {
             }
         }
         .sheet(isPresented: $isEditing) {
-            NavigationStack {
-                EntryFormView(entry: entry)
-            }
+            EntryFormView(entry: entry)
         }
     }
 }

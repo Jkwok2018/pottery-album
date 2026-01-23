@@ -11,6 +11,8 @@ struct EntryFormView: View {
     
     var entry: PotteryEntry?
     
+    @State private var path = NavigationPath()
+    
     // Form State
     @State private var name: String = ""
     @State private var date: Date = .now
@@ -23,9 +25,12 @@ struct EntryFormView: View {
     @State private var status: String = "In Progress"
     
     // Photo State
-    @State private var selectedItem: PhotosPickerItem?
+    @State private var selectedItem: PhotosUI.PhotosPickerItem?
     @State private var temporaryPhotos: [PotteryPhoto] = []
-    @State private var pendingPhoto: PhotoDraft?
+    
+    // Error Handling
+    @State private var saveError: Error?
+    @State private var showingError = false
     
     var uniqueClayTypes: [String] {
         Array(Set(allEntries.map { $0.clayType }))
@@ -40,6 +45,52 @@ struct EntryFormView: View {
     }
     
     var body: some View {
+        NavigationStack(path: $path) {
+            formContent
+                .navigationTitle(entry == nil ? "New Entry" : "Edit Entry")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") { save() }
+                            .disabled(name.isEmpty)
+                    }
+                }
+                .onAppear {
+                    if let entry = entry {
+                        name = entry.name
+                        date = entry.date
+                        clayType = entry.clayType
+                        clayWeight = entry.clayWeight
+                        firingMethod = entry.firingMethod
+                        glazes = entry.glazes
+                        notes = entry.notes
+                        shape = entry.shape
+                        status = entry.status
+                    }
+                }
+                .navigationDestination(for: PhotoDraft.self) { draft in
+                    PhotoMetadataView(item: draft.item) { data, tag, note in
+                        let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note)
+                        if let entry = entry {
+                            entry.photos.append(newPhoto)
+                        } else {
+                            temporaryPhotos.append(newPhoto)
+                        }
+                    }
+                }
+                .alert("Save Failed", isPresented: $showingError, actions: {
+                    Button("OK", role: .cancel) { }
+                }, message: {
+                    Text(saveError?.localizedDescription ?? "Unknown error")
+                })
+        }
+    }
+
+    @ViewBuilder
+    private var formContent: some View {
         Form {
             Section("General Info") {
                 TextField("Title (e.g., Blue Bowl)", text: $name)
@@ -53,7 +104,6 @@ struct EntryFormView: View {
             }
             
             Section("Specs") {
-                // Clay Type with Suggestions
                 VStack(alignment: .leading, spacing: 8) {
                     Picker("Clay Type", selection: Binding(
                         get: { uniqueClayTypes.contains(clayType) ? clayType : "Other" },
@@ -70,13 +120,11 @@ struct EntryFormView: View {
                     }
                     .pickerStyle(.menu)
                     
-                    // Show text field if "New Type..." is selected or if the current value isn't in our list
                     if !uniqueClayTypes.contains(clayType) || clayType.isEmpty {
                         TextField("Enter new clay type", text: $clayType)
                     }
                 }
                 
-                // Shape with Suggestions
                 VStack(alignment: .leading, spacing: 8) {
                     Picker("Shape", selection: Binding(
                         get: { uniqueShapes.contains(shape) ? shape : "Other" },
@@ -102,8 +150,8 @@ struct EntryFormView: View {
                     Text("Weight (lbs)")
                     Spacer()
                     TextField("Optional", value: $clayWeight, format: .number)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
                 }
             }
             
@@ -117,7 +165,6 @@ struct EntryFormView: View {
             Section("Photos") {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        // Existing Photos
                         if let entry = entry {
                             ForEach(entry.photos) { photo in
                                 PhotoThumbnail(photo: photo) {
@@ -126,14 +173,12 @@ struct EntryFormView: View {
                             }
                         }
                         
-                        // New Photos
                         ForEach(temporaryPhotos) { photo in
                             PhotoThumbnail(photo: photo) {
                                 deleteTemporaryPhoto(photo)
                             }
                         }
                         
-                        // Add Button
                         PhotosPicker(selection: $selectedItem, matching: .images) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 12)
@@ -150,10 +195,9 @@ struct EntryFormView: View {
                             }
                         }
                         .onChange(of: selectedItem) { oldValue, newValue in
-                            Task {
-                                if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                                    pendingPhoto = PhotoDraft(data: data)
-                                }
+                            if let newValue = newValue {
+                                path.append(PhotoDraft(item: newValue))
+                                selectedItem = nil
                             }
                         }
                     }
@@ -162,63 +206,24 @@ struct EntryFormView: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             }
         }
-        .navigationTitle(entry == nil ? "New Entry" : "Edit Entry")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { save() }
-                    .disabled(name.isEmpty)
-            }
-        }
-        .onAppear {
-            if let entry = entry {
-                name = entry.name
-                date = entry.date
-                clayType = entry.clayType
-                clayWeight = entry.clayWeight
-                firingMethod = entry.firingMethod
-                glazes = entry.glazes
-                notes = entry.notes
-                shape = entry.shape
-                status = entry.status
-            }
-        }
-        .sheet(item: $pendingPhoto) { draft in
-            PhotoMetadataView(imageData: draft.data) { tag, note in
-                let newPhoto = PotteryPhoto(imageData: draft.data, stageTag: tag, note: note)
-                if let entry = entry {
-                    // If editing existing, add directly
-                    entry.photos.append(newPhoto)
-                } else {
-                    // If new, add to temp
-                    temporaryPhotos.append(newPhoto)
-                }
-                selectedItem = nil
-                pendingPhoto = nil
-            }
-        }
-        .alert("Save Failed", isPresented: $showingError, actions: {
-            Button("OK", role: .cancel) { }
-        }, message: {
-            Text(saveError?.localizedDescription ?? "Unknown error")
-        })
     }
 
-    struct PhotoDraft: Identifiable {
+    struct PhotoDraft: Identifiable, Hashable {
         let id = UUID()
-        let data: Data
-    }
+        let item: PhotosUI.PhotosPickerItem
         
-    @State private var saveError: Error?
-    @State private var showingError = false
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+        }
+        
+        static func == (lhs: PhotoDraft, rhs: PhotoDraft) -> Bool {
+            lhs.id == rhs.id
+        }
+    }
 
     private func save() {
         do {
             if let entry = entry {
-                // Update existing
                 entry.name = name
                 entry.date = date
                 entry.clayType = clayType
@@ -229,7 +234,6 @@ struct EntryFormView: View {
                 entry.shape = shape
                 entry.status = status
             } else {
-                // Create new
                 let newEntry = PotteryEntry(name: name, date: date)
                 newEntry.clayType = clayType
                 newEntry.clayWeight = clayWeight
@@ -278,7 +282,6 @@ struct PhotoThumbnail: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             
-            // Tag Label
             Text(photo.stageTag)
                 .font(.caption2.bold())
                 .foregroundStyle(.white)
@@ -288,7 +291,6 @@ struct PhotoThumbnail: View {
                 .padding(4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             
-            // Delete Button
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.white, .red)
