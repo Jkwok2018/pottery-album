@@ -159,7 +159,7 @@ struct FilterSheet: View {
     
     var body: some View {
         Form {
-            Section("Criteria") {
+            Section {
                 Picker("Status", selection: $config.selectedStatus) {
                     Text("Any").tag(Optional<String>.none)
                     Text("In Progress").tag(Optional("In Progress"))
@@ -183,9 +183,11 @@ struct FilterSheet: View {
                     }
                 }
                 .pickerStyle(.menu)
+            } header: {
+                Text("Criteria").font(.footnote).bold().foregroundStyle(.secondary)
             }
             
-            Section("Minimum Weight: \(String(format: "%.1f", config.minWeight)) lbs") {
+            Section {
                 Slider(value: $config.minWeight, in: 0...max(5, maxWeightFound), step: 0.5) {
                     Text("Weight")
                 } minimumValueLabel: {
@@ -193,6 +195,8 @@ struct FilterSheet: View {
                 } maximumValueLabel: {
                     Text("\(Int(max(5, maxWeightFound)))")
                 }
+            } header: {
+                Text("Minimum Weight: \(String(format: "%.1f", config.minWeight)) lbs").font(.footnote).bold().foregroundStyle(.secondary)
             }
             
             Section {
@@ -203,6 +207,8 @@ struct FilterSheet: View {
                 .disabled(!config.isActive)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.appBackground)
         .navigationTitle("Filter Entries")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -238,39 +244,37 @@ struct PotteryCardView: View {
             }
             
             // Content
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(entry.name.isEmpty ? "Untitled Piece" : entry.name)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    
-                    Spacer()
-                    
-                    // Status Badge
-                    Text(entry.status)
-                        .font(.caption2.bold())
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(statusColor(for: entry.status).opacity(0.1))
-                        .foregroundStyle(statusColor(for: entry.status))
-                        .clipShape(Capsule())
-                        .font(.footnote).bold()
-                }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(entry.name.isEmpty ? "Untitled Piece" : entry.name)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
                 
                 Text(entry.date.formatted(date: .abbreviated, time: .omitted))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 
-                if !entry.clayType.isEmpty {
-                    Text(entry.clayType)
-                        .font(.footnote).fontWeight(.semibold)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.primary.opacity(0.1))
-                        .foregroundStyle(Color.primary)
+                HStack(spacing: 8) {
+                    // Status Badge
+                    Text(entry.status)
+                        .font(.footnote).bold()
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(statusColor(for: entry.status).opacity(0.1))
+                        .foregroundStyle(statusColor(for: entry.status))
                         .clipShape(Capsule())
-                        .padding(.top, 4)
+                    
+                    // Clay Type Tag
+                    if !entry.clayType.isEmpty {
+                        Text(entry.clayType)
+                            .font(.footnote).fontWeight(.semibold)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.primary.opacity(0.1))
+                            .foregroundStyle(Color.primary)
+                            .clipShape(Capsule())
+                    }
                 }
+                .padding(.top, 2)
             }
             Spacer()
             

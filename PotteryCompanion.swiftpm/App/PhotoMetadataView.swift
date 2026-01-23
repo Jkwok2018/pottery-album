@@ -45,6 +45,8 @@ struct PhotoMetadataView: View {
                 Text("Details").font(.footnote).bold().foregroundStyle(.secondary)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.appBackground)
         .navigationTitle("Tag Photo")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
