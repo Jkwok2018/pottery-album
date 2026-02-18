@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import UserNotifications
 
 struct EntryFormView: View {
     @Environment(\.modelContext) private var modelContext
@@ -10,19 +11,26 @@ struct EntryFormView: View {
     @Query private var allEntries: [PotteryEntry]
     
     var entry: PotteryEntry?
+    var onSave: ((PotteryEntry) -> Void)? = nil
     
     @State private var path = NavigationPath()
     
     // Form State
     @State private var name: String = ""
     @State private var date: Date = .now
+    @State private var dateTrimmed: Date?
+    @State private var dateGlazed: Date?
+    
+    // Reminder State
+    @State private var reminderAfterCreated: Int? = nil
+    @State private var reminderAfterTrimmed: Int? = nil
+    
     @State private var clayType: String = ""
     @State private var clayWeight: Double?
-    @State private var firingMethod: String = ""
     @State private var glazes: String = ""
     @State private var notes: String = ""
     @State private var shape: String = ""
-    @State private var status: String = "In Progress"
+    @State private var status: String = PotteryStage.greenware.rawValue
     
     // Photo State
     @State private var selectedItem: PhotosUI.PhotosPickerItem?
@@ -62,9 +70,13 @@ struct EntryFormView: View {
                     if let entry = entry {
                         name = entry.name
                         date = entry.date
+                        dateTrimmed = entry.dateTrimmed
+                        dateGlazed = entry.dateGlazed
+                        reminderAfterCreated = entry.reminderDaysAfterCreated
+                        reminderAfterTrimmed = entry.reminderDaysAfterTrimmed
+                        
                         clayType = entry.clayType
                         clayWeight = entry.clayWeight
-                        firingMethod = entry.firingMethod
                         glazes = entry.glazes
                         notes = entry.notes
                         shape = entry.shape
@@ -76,8 +88,11 @@ struct EntryFormView: View {
                         let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note)
                         if let entry = entry {
                             entry.photos.append(newPhoto)
+                            entry.updateStatusFromPhotos()
+                            status = entry.status
                         } else {
                             temporaryPhotos.append(newPhoto)
+                            updateStatusFromTemporaryPhotos()
                         }
                     }
                 }
@@ -94,15 +109,23 @@ struct EntryFormView: View {
         Form {
             Section {
                 TextField("Title (e.g., Blue Bowl)", text: $name)
-                DatePicker("Date Created", selection: $date, displayedComponents: .date)
                 
                 Picker("Status", selection: $status) {
-                    Text("In Progress").tag("In Progress")
-                    Text("Completed").tag("Completed")
-                    Text("Stopped").tag("Stopped")
+                    ForEach(PotteryStage.allCases, id: \.self) { stage in
+                        Text(stage.rawValue).tag(stage.rawValue)
+                    }
                 }
             } header: {
                 Text("General Info").font(.footnote).bold().foregroundStyle(.secondary)
+            }
+            
+            Section {
+                DatePicker("Date Created", selection: $date, displayedComponents: .date)
+                
+                OptionalDatePickerRow(label: "Date Trimmed", selection: $dateTrimmed)
+                OptionalDatePickerRow(label: "Date Glazed", selection: $dateGlazed)
+            } header: {
+                Text("Dates").font(.footnote).bold().foregroundStyle(.secondary)
             }
             
             Section {
@@ -160,12 +183,31 @@ struct EntryFormView: View {
             }
             
             Section {
-                TextField("Firing Method (e.g. Cone 6 Electric)", text: $firingMethod)
                 TextField("Glazes Used", text: $glazes)
                 TextField("Notes", text: $notes, axis: .vertical)
                     .lineLimit(3...6)
             } header: {
                 Text("Process").font(.footnote).bold().foregroundStyle(.secondary)
+            }
+            
+            Section {
+                HStack {
+                    Text("Days after created")
+                    Spacer()
+                    TextField("None", value: $reminderAfterCreated, format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                HStack {
+                    Text("Days after trimmed")
+                    Spacer()
+                    TextField("None", value: $reminderAfterTrimmed, format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                }
+            } header: {
+                Text("Reminders").font(.footnote).bold().foregroundStyle(.secondary)
             }
             
             Section {
@@ -233,29 +275,45 @@ struct EntryFormView: View {
 
     private func save() {
         do {
+            let savedEntry: PotteryEntry
             if let entry = entry {
                 entry.name = name
                 entry.date = date
+                entry.dateTrimmed = dateTrimmed
+                entry.dateGlazed = dateGlazed
+                entry.reminderDaysAfterCreated = reminderAfterCreated
+                entry.reminderDaysAfterTrimmed = reminderAfterTrimmed
+                
                 entry.clayType = clayType
                 entry.clayWeight = clayWeight
-                entry.firingMethod = firingMethod
                 entry.glazes = glazes
                 entry.notes = notes
                 entry.shape = shape
                 entry.status = status
+                
+                scheduleNotifications(for: entry)
+                savedEntry = entry
             } else {
                 let newEntry = PotteryEntry(name: name, date: date)
+                newEntry.dateTrimmed = dateTrimmed
+                newEntry.dateGlazed = dateGlazed
+                newEntry.reminderDaysAfterCreated = reminderAfterCreated
+                newEntry.reminderDaysAfterTrimmed = reminderAfterTrimmed
+                
                 newEntry.clayType = clayType
                 newEntry.clayWeight = clayWeight
-                newEntry.firingMethod = firingMethod
                 newEntry.glazes = glazes
                 newEntry.notes = notes
                 newEntry.shape = shape
                 newEntry.status = status
                 newEntry.photos = temporaryPhotos
                 modelContext.insert(newEntry)
+                
+                scheduleNotifications(for: newEntry)
+                savedEntry = newEntry
             }
             try modelContext.save()
+            onSave?(savedEntry)
             dismiss()
         } catch {
             print("Error saving entry: \(error)")
@@ -268,12 +326,66 @@ struct EntryFormView: View {
         if let index = entry.photos.firstIndex(of: photo) {
             entry.photos.remove(at: index)
             modelContext.delete(photo)
+            entry.updateStatusFromPhotos()
+            status = entry.status
         }
     }
     
     private func deleteTemporaryPhoto(_ photo: PotteryPhoto) {
         if let index = temporaryPhotos.firstIndex(of: photo) {
             temporaryPhotos.remove(at: index)
+            updateStatusFromTemporaryPhotos()
+        }
+    }
+    
+    private func updateStatusFromTemporaryPhotos() {
+        let stages = temporaryPhotos.compactMap { PotteryStage(rawValue: $0.stageTag) }
+        if let latestStage = stages.max() {
+            status = latestStage.rawValue
+        }
+    }
+
+    private func scheduleNotifications(for entry: PotteryEntry) {
+        let center = UNUserNotificationCenter.current()
+        
+        // Remove existing notifications for this entry
+        center.removePendingNotificationRequests(withIdentifiers: [
+            "\(entry.id.uuidString)-created",
+            "\(entry.id.uuidString)-trimmed"
+        ])
+        
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            guard granted else { return }
+            
+            // Reminder after Created
+            if let days = entry.reminderDaysAfterCreated, days >= 0 {
+                let content = UNMutableNotificationContent()
+                content.title = "Pottery Reminder"
+                content.body = "Time to check on \"\(entry.name)\"! It was created \(days) days ago."
+                content.sound = .default
+                
+                let triggerDate = Calendar.current.date(byAdding: .day, value: days, to: entry.date) ?? entry.date
+                let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+                
+                let request = UNNotificationRequest(identifier: "\(entry.id.uuidString)-created", content: content, trigger: trigger)
+                center.add(request)
+            }
+            
+            // Reminder after Trimmed
+            if let days = entry.reminderDaysAfterTrimmed, let trimDate = entry.dateTrimmed, days >= 0 {
+                let content = UNMutableNotificationContent()
+                content.title = "Pottery Reminder"
+                content.body = "Time to check on \"\(entry.name)\"! It was trimmed \(days) days ago."
+                content.sound = .default
+                
+                let triggerDate = Calendar.current.date(byAdding: .day, value: days, to: trimDate) ?? trimDate
+                let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+                
+                let request = UNNotificationRequest(identifier: "\(entry.id.uuidString)-trimmed", content: content, trigger: trigger)
+                center.add(request)
+            }
         }
     }
 }
@@ -309,5 +421,39 @@ struct PhotoThumbnail: View {
             .padding(-6)
         }
         .frame(width: 100, height: 100)
+    }
+}
+
+struct OptionalDatePickerRow: View {
+    let label: String
+    @Binding var selection: Date?
+    
+    var body: some View {
+        HStack {
+            Text(label)
+            Spacer()
+            if let date = selection {
+                DatePicker("", selection: Binding(
+                    get: { date },
+                    set: { selection = $0 }
+                ), displayedComponents: .date)
+                .labelsHidden()
+                
+                Button {
+                    selection = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button("Add Date") {
+                    selection = .now
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+        }
     }
 }

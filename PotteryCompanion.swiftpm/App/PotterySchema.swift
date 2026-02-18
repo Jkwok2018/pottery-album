@@ -2,14 +2,33 @@ import SwiftData
 import Foundation
 import SwiftUI
 
+enum PotteryStage: String, CaseIterable, Codable, Comparable {
+    case greenware = "Greenware"
+    case trimmed = "Trimmed"
+    case bisque = "Bisque"
+    case glazed = "Glazed"
+    case finished = "Finished"
+    
+    static func < (lhs: PotteryStage, rhs: PotteryStage) -> Bool {
+        let allCases = self.allCases
+        return allCases.firstIndex(of: lhs)! < allCases.firstIndex(of: rhs)!
+    }
+}
+
 @Model
 final class PotteryEntry {
     var id: UUID
     var name: String
     var date: Date
+    var dateTrimmed: Date?
+    var dateGlazed: Date?
+    
+    // Reminders (days after event)
+    var reminderDaysAfterCreated: Int?
+    var reminderDaysAfterTrimmed: Int?
+    
     var clayType: String // Keeping non-optional string for simplicity, empty string = none
     var clayWeight: Double? // in pounds
-    var firingMethod: String
     var glazes: String
     var notes: String
     
@@ -26,11 +45,17 @@ final class PotteryEntry {
         self.date = date
         self.clayType = ""
         // clayWeight is optional, defaults to nil
-        self.firingMethod = ""
         self.glazes = ""
         self.notes = ""
         self.shape = ""
-        self.status = "In Progress"
+        self.status = PotteryStage.greenware.rawValue
+    }
+    
+    func updateStatusFromPhotos() {
+        let stages = photos.compactMap { PotteryStage(rawValue: $0.stageTag) }
+        if let latestStage = stages.max() {
+            self.status = latestStage.rawValue
+        }
     }
 }
 
@@ -42,7 +67,7 @@ final class PotteryPhoto {
     var note: String
     var dateAdded: Date
     
-    init(imageData: Data, stageTag: String = "Finished", note: String = "") {
+    init(imageData: Data, stageTag: String = PotteryStage.greenware.rawValue, note: String = "") {
         self.id = UUID()
         self.imageData = imageData
         self.stageTag = stageTag

@@ -9,8 +9,8 @@ struct PotteryAlbumApp: App {
         let schema = Schema([
             PotteryEntry.self,
             PotteryPhoto.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        ]);
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false);
 
         do {
             container = try ModelContainer(for: schema, configurations: [modelConfiguration])

@@ -16,14 +16,15 @@ struct EntryDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 // Top Header (Name & Date)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.name)
+                    TextField("Name", text: $entry.name)
                         .font(.system(size: 34, weight: .bold, design: .serif))
                         .foregroundStyle(.primary)
                     
                     HStack(spacing: 6) {
                         Image(systemName: "calendar")
                             .font(.subheadline)
-                        Text(entry.date.formatted(date: .long, time: .omitted))
+                        DatePicker("", selection: $entry.date, displayedComponents: .date)
+                            .labelsHidden()
                             .font(.subheadline)
                     }
                     .foregroundStyle(.secondary)
@@ -122,19 +123,69 @@ struct EntryDetailView: View {
                         .padding(.leading, 8)
                     
                     VStack(spacing: 0) {
-                        DetailRow(label: "Type", value: entry.shape)
+                        EditableDetailRow(label: "Type", value: $entry.shape)
                         Divider().padding(.horizontal)
-                        DetailRow(label: "Status", value: entry.status)
-                        Divider().padding(.horizontal)
-                        DetailRow(label: "Clay", value: entry.clayType)
-                        Divider().padding(.horizontal)
-                        DetailRow(label: "Glaze", value: entry.glazes)
-                        Divider().padding(.horizontal)
-                        DetailRow(label: "Firing", value: entry.firingMethod)
-                        if let weight = entry.clayWeight {
-                            Divider().padding(.horizontal)
-                            DetailRow(label: "Weight", value: "\(String(format: "%.1f", weight)) lbs")
+                        
+                        HStack {
+                            Text("Status")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Picker("", selection: $entry.status) {
+                                ForEach(PotteryStage.allCases, id: \.self) { stage in
+                                    Text(stage.rawValue).tag(stage.rawValue)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
                         }
+                        .padding()
+                        
+                        Divider().padding(.horizontal)
+                        
+                        HStack {
+                            Text("Clay")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("Clay Type", text: $entry.clayType)
+                                .multilineTextAlignment(.trailing)
+                                .fontWeight(.medium)
+                        }
+                        .padding()
+                        
+                        Divider().padding(.horizontal)
+                        
+                        OptionalDatePickerRow(label: "Trimmed", selection: $entry.dateTrimmed)
+                            .padding()
+                        
+                        Divider().padding(.horizontal)
+                        
+                        OptionalDatePickerRow(label: "Glazed", selection: $entry.dateGlazed)
+                            .padding()
+                        
+                        Divider().padding(.horizontal)
+                        
+                        HStack {
+                            Text("Glaze")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("Glaze Used", text: $entry.glazes)
+                                .multilineTextAlignment(.trailing)
+                                .fontWeight(.medium)
+                        }
+                        .padding()
+                        
+                        Divider().padding(.horizontal)
+                        
+                        HStack {
+                            Text("Weight")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("0.0", value: $entry.clayWeight, format: .number)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .fontWeight(.medium)
+                        }
+                        .padding()
                     }
                     .background(Color(uiColor: .systemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -149,11 +200,10 @@ struct EntryDetailView: View {
                             .foregroundStyle(.secondary)
                             .padding(.leading, 8)
                         
-                        Text(entry.notes)
+                        TextEditor(text: $entry.notes)
                             .font(.body)
-                            .lineSpacing(4)
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .frame(minHeight: 100)
                             .background(Color(uiColor: .systemBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -165,8 +215,8 @@ struct EntryDetailView: View {
         .background(Color.appBackground)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            Button("Edit") {
-                isEditing = true
+            ToolbarItem(placement: .topBarTrailing) {
+                // No Edit button needed as fields are directly editable
             }
         }
         .sheet(isPresented: $isEditing) {
@@ -176,6 +226,7 @@ struct EntryDetailView: View {
             PhotoMetadataView(item: draft.item) { data, tag, note in
                 let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note)
                 entry.photos.append(newPhoto)
+                entry.updateStatusFromPhotos()
                 selectedPhoto = newPhoto
                 selectedItem = nil
                 pendingPhoto = nil
@@ -189,16 +240,17 @@ struct EntryDetailView: View {
     }
 }
 
-struct DetailRow: View {
+struct EditableDetailRow: View {
     let label: String
-    let value: String
+    @Binding var value: String
     
     var body: some View {
         HStack {
             Text(label)
                 .foregroundStyle(.secondary)
             Spacer()
-            Text(value.isEmpty ? "-" : value)
+            TextField("None", text: $value)
+                .multilineTextAlignment(.trailing)
                 .fontWeight(.medium)
         }
         .padding()

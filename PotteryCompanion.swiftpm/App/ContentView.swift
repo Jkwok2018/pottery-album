@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var showingFilterSheet = false
     @State private var searchText = ""
     @State private var filterConfig = FilterConfig()
+    @State private var path = NavigationPath()
 
     var filteredEntries: [PotteryEntry] {
         var result = entries
@@ -46,7 +47,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 // Custom Search & Filter Header
                 HStack(spacing: 12) {
@@ -75,7 +76,7 @@ struct ContentView: View {
                 } else {
                     LazyVStack(spacing: 16) {
                         ForEach(filteredEntries) { entry in
-                            NavigationLink(destination: EntryDetailView(entry: entry)) {
+                            NavigationLink(value: entry) {
                                 PotteryCardView(entry: entry)
                             }
                             .buttonStyle(PlainButtonStyle())
@@ -116,8 +117,13 @@ struct ContentView: View {
                 }
             }
             .sheet(isPresented: $showingAddSheet) {
-                EntryFormView(entry: nil)
-                    .modelContext(modelContext)
+                EntryFormView(entry: nil) { newEntry in
+                    path.append(newEntry)
+                }
+                .modelContext(modelContext)
+            }
+            .navigationDestination(for: PotteryEntry.self) { entry in
+                EntryDetailView(entry: entry)
             }
             .sheet(isPresented: $showingFilterSheet) {
                 NavigationStack {

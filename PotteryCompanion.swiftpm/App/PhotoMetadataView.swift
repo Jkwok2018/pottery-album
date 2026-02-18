@@ -6,9 +6,9 @@ struct PhotoMetadataView: View {
     var onSave: (Data, String, String) -> Void
     
     @State private var imageData: Data?
-    @State private var selectedTag = "Finished"
+    @State private var selectedTag = PotteryStage.finished
     @State private var note = ""
-    let tags = ["Greenware", "Trimmed", "Bisque", "Glazed", "Finished"]
+    let stages = PotteryStage.allCases
     
     @Environment(\.dismiss) private var dismiss
     
@@ -34,8 +34,8 @@ struct PhotoMetadataView: View {
             
             Section {
                 Picker("Stage", selection: $selectedTag) {
-                    ForEach(tags, id: \.self) { tag in
-                        Text(tag).tag(tag)
+                    ForEach(stages, id: \.self) { stage in
+                        Text(stage.rawValue).tag(stage)
                     }
                 }
                 
@@ -53,8 +53,7 @@ struct PhotoMetadataView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") {
                     if let data = imageData {
-                        onSave(data, selectedTag, note)
-                        dismiss()
+                        onSave(data, selectedTag.rawValue, note)
                     }
                 }
                 .disabled(imageData == nil)
