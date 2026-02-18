@@ -73,90 +73,92 @@ struct EntryDetailView: View {
     
     @ViewBuilder
     private var photoGallerySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("📸 PHOTOS")
                 .font(.footnote).bold()
                 .foregroundStyle(.secondary)
                 .padding(.leading, 8)
             
-            // Main Photo Display
-            ZStack {
-                Color(uiColor: .systemBackground)
-                
-                if let photo = selectedPhoto ?? entry.photos.first,
-                   let uiImage = UIImage(data: photo.imageData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .font(.system(size: 60))
-                            .foregroundStyle(.tertiary)
-                        Text("No Photos Yet")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 320)
-            .background(Color(uiColor: .systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            
-            // Photo Notes/Caption
-            if let photo = selectedPhoto ?? entry.photos.first {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "quote.bubble")
-                        .foregroundStyle(.secondary)
-                    Text(photo.note.isEmpty ? photo.stageTag : "\(photo.stageTag): \(photo.note)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .italic()
-                }
-                .padding(.horizontal, 8)
-            }
-            
-            // Thumbnail Bar
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(entry.photos) { photo in
-                        Button {
-                            selectedPhoto = photo
-                        } label: {
-                            if let uiImage = UIImage(data: photo.imageData) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 55, height: 55)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(selectedPhoto == photo || (selectedPhoto == nil && photo == entry.photos.first) ? Color.primary : Color.clear, lineWidth: 2)
-                                    )
-                            }
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 16) {
+                // Main Photo Display
+                ZStack {
+                    Color(uiColor: .systemBackground)
                     
-                    PhotosPicker(selection: $selectedItem, matching: .images) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(uiColor: .tertiarySystemBackground))
-                                .frame(width: 55, height: 55)
-                            Image(systemName: "plus")
-                                .font(.title3)
+                    if let photo = selectedPhoto ?? entry.photos.first,
+                       let uiImage = UIImage(data: photo.imageData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "photo.on.rectangle.angled")
+                                .font(.system(size: 60))
+                                .foregroundStyle(.tertiary)
+                            Text("No Photos Yet")
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity)
+                .frame(height: 320)
+                .background(Color(uiColor: .systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                
+                // Photo Notes/Caption
+                if let photo = selectedPhoto ?? entry.photos.first {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "quote.bubble")
+                            .foregroundStyle(.secondary)
+                        Text(photo.note.isEmpty ? photo.stageTag : "\(photo.stageTag): \(photo.note)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .italic()
+                    }
+                    .padding(.horizontal, 8)
+                }
+                
+                // Thumbnail Bar
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(entry.photos) { photo in
+                            Button {
+                                selectedPhoto = photo
+                            } label: {
+                                if let uiImage = UIImage(data: photo.imageData) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 55, height: 55)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(selectedPhoto == photo || (selectedPhoto == nil && photo == entry.photos.first) ? Color.primary : Color.clear, lineWidth: 2)
+                                        )
+                                }
+                            }
+                        }
+                        
+                        PhotosPicker(selection: $selectedItem, matching: .images) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(uiColor: .tertiarySystemBackground))
+                                    .frame(width: 55, height: 55)
+                                Image(systemName: "plus")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 4)
+                }
             }
+            .padding(16)
+            .background(Color(uiColor: .systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
         }
-        .padding(16)
-        .background(Color(uiColor: .systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder

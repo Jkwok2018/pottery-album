@@ -93,7 +93,7 @@ struct ContentView: View {
                 }
             }
             .background(Color.appBackground)
-            .navigationTitle("Pottery Log")
+            .navigationTitle("Pottery Album")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     // Reset button still useful in toolbar, or move to sheet? 

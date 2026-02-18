@@ -8,15 +8,15 @@ import PackageDescription
 import AppleProductTypes
 
 let package = Package(
-    name: "PotteryCompanion",
+    name: "PotteryAlbum",
     platforms: [
         .iOS("17.0")
     ],
     products: [
         .iOSApplication(
-            name: "PotteryCompanion",
+            name: "Pottery Album",
             targets: ["AppModule"],
-            bundleIdentifier: "com.example.potterycompanion",
+            bundleIdentifier: "com.jkwok.potteryalbum",
             teamIdentifier: "5SQZ53CYMT",
             displayVersion: "1.0",
             bundleVersion: "1",

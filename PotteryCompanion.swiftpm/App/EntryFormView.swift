@@ -128,13 +128,25 @@ struct EntryFormView: View {
         Section {
             TextField("Title (e.g., Blue Bowl)", text: $name)
             
-            Picker("Status", selection: $status) {
-                ForEach(PotteryStage.allCases, id: \.self) { stage in
-                    Text(stage.rawValue).tag(stage.rawValue)
+            HStack {
+                Text("Status")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: $status) {
+                    ForEach(PotteryStage.allCases, id: \.self) { stage in
+                        Text(stage.rawValue).tag(stage.rawValue)
+                    }
                 }
+                .labelsHidden()
             }
             
-            DatePicker("Date Created", selection: $date, displayedComponents: .date)
+            HStack {
+                Text("Date Created")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                DatePicker("", selection: $date, displayedComponents: .date)
+                    .labelsHidden()
+            }
             OptionalDatePickerRow(label: "Date Trimmed", selection: $dateTrimmed)
             OptionalDatePickerRow(label: "Date Glazed", selection: $dateGlazed)
         } header: {
@@ -157,23 +169,29 @@ struct EntryFormView: View {
     @ViewBuilder
     private var clayTypePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Clay Type", selection: Binding(
-                get: { enteringNewClayType ? "Other" : (uniqueClayTypes.contains(clayType) ? clayType : "Other") },
-                set: { newValue in
-                    if newValue == "Other" {
-                        enteringNewClayType = true
-                    } else {
-                        enteringNewClayType = false
-                        clayType = newValue
+            HStack {
+                Text("Clay Type")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: Binding(
+                    get: { enteringNewClayType ? "Other" : (uniqueClayTypes.contains(clayType) ? clayType : "Other") },
+                    set: { newValue in
+                        if newValue == "Other" {
+                            enteringNewClayType = true
+                        } else {
+                            enteringNewClayType = false
+                            clayType = newValue
+                        }
                     }
+                )) {
+                    ForEach(uniqueClayTypes, id: \.self) { type in
+                        Text(type).tag(type)
+                    }
+                    Text("New Type...").tag("Other")
                 }
-            )) {
-                ForEach(uniqueClayTypes, id: \.self) { type in
-                    Text(type).tag(type)
-                }
-                Text("New Type...").tag("Other")
+                .labelsHidden()
+                .pickerStyle(.menu)
             }
-            .pickerStyle(.menu)
             
             if enteringNewClayType || !uniqueClayTypes.contains(clayType) || clayType.isEmpty {
                 TextField("Enter new clay type", text: $clayType)
@@ -184,23 +202,29 @@ struct EntryFormView: View {
     @ViewBuilder
     private var shapePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Shape", selection: Binding(
-                get: { enteringNewShape ? "Other" : (uniqueShapes.contains(shape) ? shape : "Other") },
-                set: { newValue in
-                    if newValue == "Other" {
-                        enteringNewShape = true
-                    } else {
-                        enteringNewShape = false
-                        shape = newValue
+            HStack {
+                Text("Shape")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: Binding(
+                    get: { enteringNewShape ? "Other" : (uniqueShapes.contains(shape) ? shape : "Other") },
+                    set: { newValue in
+                        if newValue == "Other" {
+                            enteringNewShape = true
+                        } else {
+                            enteringNewShape = false
+                            shape = newValue
+                        }
                     }
+                )) {
+                    ForEach(uniqueShapes, id: \.self) { s in
+                        Text(s).tag(s)
+                    }
+                    Text("New Shape...").tag("Other")
                 }
-            )) {
-                ForEach(uniqueShapes, id: \.self) { s in
-                    Text(s).tag(s)
-                }
-                Text("New Shape...").tag("Other")
+                .labelsHidden()
+                .pickerStyle(.menu)
             }
-            .pickerStyle(.menu)
             
             if enteringNewShape || !uniqueShapes.contains(shape) || shape.isEmpty {
                 TextField("Enter new shape (e.g., Mug)", text: $shape)
@@ -212,6 +236,7 @@ struct EntryFormView: View {
     private var weightField: some View {
         HStack {
             Text("Weight (lbs)")
+                .foregroundStyle(.secondary)
             Spacer()
             TextField("Optional", value: $clayWeight, format: .number)
                 .keyboardType(.decimalPad)
@@ -536,6 +561,7 @@ struct OptionalDatePickerRow: View {
     var body: some View {
         HStack {
             Text(label)
+                .foregroundStyle(.secondary)
             Spacer()
             if let date = selection {
                 DatePicker("", selection: Binding(

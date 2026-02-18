@@ -54,6 +54,7 @@ struct PhotoMetadataView: View {
                 Button("Done") {
                     if let data = imageData {
                         onSave(data, selectedTag.rawValue, note)
+                        dismiss()
                     }
                 }
                 .disabled(imageData == nil)
