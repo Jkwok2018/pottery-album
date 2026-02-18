@@ -22,19 +22,25 @@ struct EntryFormView: View {
     @State private var dateGlazed: Date?
     
     // Reminder State
-    @State private var reminderAfterCreated: Int? = nil
-    @State private var reminderAfterTrimmed: Int? = nil
+    @State private var enableTrimReminder: Bool = false
+    @State private var trimReminderDays: Int = 3
     
     @State private var clayType: String = ""
     @State private var clayWeight: Double?
-    @State private var glazes: String = ""
+    @State private var glazes: [String] = []
     @State private var notes: String = ""
     @State private var shape: String = ""
     @State private var status: String = PotteryStage.greenware.rawValue
     
+    @State private var showingNewGlazeField = false
+    @State private var newGlazeName = ""
+    
     // Photo State
     @State private var selectedItem: PhotosUI.PhotosPickerItem?
     @State private var temporaryPhotos: [PotteryPhoto] = []
+    
+    @State private var enteringNewClayType = false
+    @State private var enteringNewShape = false
     
     // Error Handling
     @State private var saveError: Error?
@@ -72,8 +78,8 @@ struct EntryFormView: View {
                         date = entry.date
                         dateTrimmed = entry.dateTrimmed
                         dateGlazed = entry.dateGlazed
-                        reminderAfterCreated = entry.reminderDaysAfterCreated
-                        reminderAfterTrimmed = entry.reminderDaysAfterTrimmed
+                        enableTrimReminder = entry.enableTrimReminder
+                        trimReminderDays = entry.trimReminderDays
                         
                         clayType = entry.clayType
                         clayWeight = entry.clayWeight
@@ -107,157 +113,269 @@ struct EntryFormView: View {
     @ViewBuilder
     private var formContent: some View {
         Form {
-            Section {
-                TextField("Title (e.g., Blue Bowl)", text: $name)
-                
-                Picker("Status", selection: $status) {
-                    ForEach(PotteryStage.allCases, id: \.self) { stage in
-                        Text(stage.rawValue).tag(stage.rawValue)
-                    }
-                }
-            } header: {
-                Text("General Info").font(.footnote).bold().foregroundStyle(.secondary)
-            }
-            
-            Section {
-                DatePicker("Date Created", selection: $date, displayedComponents: .date)
-                
-                OptionalDatePickerRow(label: "Date Trimmed", selection: $dateTrimmed)
-                OptionalDatePickerRow(label: "Date Glazed", selection: $dateGlazed)
-            } header: {
-                Text("Dates").font(.footnote).bold().foregroundStyle(.secondary)
-            }
-            
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Picker("Clay Type", selection: Binding(
-                        get: { uniqueClayTypes.contains(clayType) ? clayType : "Other" },
-                        set: { newValue in
-                            if newValue != "Other" {
-                                clayType = newValue
-                            }
-                        }
-                    )) {
-                        ForEach(uniqueClayTypes, id: \.self) { type in
-                            Text(type).tag(type)
-                        }
-                        Text("New Type...").tag("Other")
-                    }
-                    .pickerStyle(.menu)
-                    
-                    if !uniqueClayTypes.contains(clayType) || clayType.isEmpty {
-                        TextField("Enter new clay type", text: $clayType)
-                    }
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Picker("Shape", selection: Binding(
-                        get: { uniqueShapes.contains(shape) ? shape : "Other" },
-                        set: { newValue in
-                            if newValue != "Other" {
-                                shape = newValue
-                            }
-                        }
-                    )) {
-                        ForEach(uniqueShapes, id: \.self) { s in
-                            Text(s).tag(s)
-                        }
-                        Text("New Shape...").tag("Other")
-                    }
-                    .pickerStyle(.menu)
-                    
-                    if !uniqueShapes.contains(shape) || shape.isEmpty {
-                        TextField("Enter new shape (e.g., Mug)", text: $shape)
-                    }
-                }
-                
-                HStack {
-                    Text("Weight (lbs)")
-                    Spacer()
-                    TextField("Optional", value: $clayWeight, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                }
-            } header: {
-                Text("Specs").font(.footnote).bold().foregroundStyle(.secondary)
-            }
-            
-            Section {
-                TextField("Glazes Used", text: $glazes)
-                TextField("Notes", text: $notes, axis: .vertical)
-                    .lineLimit(3...6)
-            } header: {
-                Text("Process").font(.footnote).bold().foregroundStyle(.secondary)
-            }
-            
-            Section {
-                HStack {
-                    Text("Days after created")
-                    Spacer()
-                    TextField("None", value: $reminderAfterCreated, format: .number)
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
-                }
-                
-                HStack {
-                    Text("Days after trimmed")
-                    Spacer()
-                    TextField("None", value: $reminderAfterTrimmed, format: .number)
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
-                }
-            } header: {
-                Text("Reminders").font(.footnote).bold().foregroundStyle(.secondary)
-            }
-            
-            Section {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        if let entry = entry {
-                            ForEach(entry.photos) { photo in
-                                PhotoThumbnail(photo: photo) {
-                                    deletePhoto(photo, from: entry)
-                                }
-                            }
-                        }
-                        
-                        ForEach(temporaryPhotos) { photo in
-                            PhotoThumbnail(photo: photo) {
-                                deleteTemporaryPhoto(photo)
-                            }
-                        }
-                        
-                        PhotosPicker(selection: $selectedItem, matching: .images) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.secondary.opacity(0.1))
-                                    .frame(width: 100, height: 100)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5]))
-                                            .foregroundStyle(.secondary)
-                                    )
-                                Image(systemName: "plus")
-                                    .font(.largeTitle)
-                                    .foregroundStyle(.tint)
-                            }
-                        }
-                        .onChange(of: selectedItem) { oldValue, newValue in
-                            if let newValue = newValue {
-                                path.append(PhotoDraft(item: newValue))
-                                selectedItem = nil
-                            }
-                        }
-                    }
-                    .padding(.vertical, 8)
-                }
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-            } header: {
-                Text("Photos").font(.footnote).bold().foregroundStyle(.secondary)
-            }
+            generalInfoSection
+            specsSection
+            processSection
+            photosSection
+            remindersSection
         }
         .scrollContentBackground(.hidden)
         .background(Color.appBackground)
+    }
+    
+    @ViewBuilder
+    private var generalInfoSection: some View {
+        Section {
+            TextField("Title (e.g., Blue Bowl)", text: $name)
+            
+            Picker("Status", selection: $status) {
+                ForEach(PotteryStage.allCases, id: \.self) { stage in
+                    Text(stage.rawValue).tag(stage.rawValue)
+                }
+            }
+            
+            DatePicker("Date Created", selection: $date, displayedComponents: .date)
+            OptionalDatePickerRow(label: "Date Trimmed", selection: $dateTrimmed)
+            OptionalDatePickerRow(label: "Date Glazed", selection: $dateGlazed)
+        } header: {
+            Text("📝 General Info").font(.footnote).bold().foregroundStyle(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private var specsSection: some View {
+        Section {
+            shapePicker
+            clayTypePicker
+            weightField
+            glazeManagementView
+        } header: {
+            Text("🏗️ Specs").font(.footnote).bold().foregroundStyle(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private var clayTypePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("Clay Type", selection: Binding(
+                get: { enteringNewClayType ? "Other" : (uniqueClayTypes.contains(clayType) ? clayType : "Other") },
+                set: { newValue in
+                    if newValue == "Other" {
+                        enteringNewClayType = true
+                    } else {
+                        enteringNewClayType = false
+                        clayType = newValue
+                    }
+                }
+            )) {
+                ForEach(uniqueClayTypes, id: \.self) { type in
+                    Text(type).tag(type)
+                }
+                Text("New Type...").tag("Other")
+            }
+            .pickerStyle(.menu)
+            
+            if enteringNewClayType || !uniqueClayTypes.contains(clayType) || clayType.isEmpty {
+                TextField("Enter new clay type", text: $clayType)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var shapePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("Shape", selection: Binding(
+                get: { enteringNewShape ? "Other" : (uniqueShapes.contains(shape) ? shape : "Other") },
+                set: { newValue in
+                    if newValue == "Other" {
+                        enteringNewShape = true
+                    } else {
+                        enteringNewShape = false
+                        shape = newValue
+                    }
+                }
+            )) {
+                ForEach(uniqueShapes, id: \.self) { s in
+                    Text(s).tag(s)
+                }
+                Text("New Shape...").tag("Other")
+            }
+            .pickerStyle(.menu)
+            
+            if enteringNewShape || !uniqueShapes.contains(shape) || shape.isEmpty {
+                TextField("Enter new shape (e.g., Mug)", text: $shape)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var weightField: some View {
+        HStack {
+            Text("Weight (lbs)")
+            Spacer()
+            TextField("Optional", value: $clayWeight, format: .number)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+        }
+    }
+    
+    @ViewBuilder
+    private var processSection: some View {
+        Section {
+            TextField("Notes", text: $notes, axis: .vertical)
+                .lineLimit(3...6)
+        } header: {
+            Text("📓 Notes").font(.footnote).bold().foregroundStyle(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private var glazeManagementView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            glazeFlowList
+            glazePickerRow
+        }
+    }
+    
+    @ViewBuilder
+    private var glazeFlowList: some View {
+        if !glazes.isEmpty {
+            FlowLayout(spacing: 8) {
+                ForEach(glazes, id: \.self) { glaze in
+                    HStack(spacing: 4) {
+                        Text(glaze)
+                            .font(.subheadline)
+                        Button {
+                            glazes.removeAll { $0 == glaze }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.tint.opacity(0.1))
+                    .clipShape(Capsule())
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var glazePickerRow: some View {
+        HStack {
+            Picker("Add Glaze", selection: Binding(
+                get: { "Add Glaze..." },
+                set: { newValue in
+                    if newValue == "New..." {
+                        showingNewGlazeField = true
+                    } else if newValue != "Add Glaze..." && !glazes.contains(newValue) {
+                        glazes.append(newValue)
+                    }
+                }
+            )) {
+                Text("Add Glaze...").tag("Add Glaze...")
+                ForEach(uniqueGlazes, id: \.self) { g in
+                    if !glazes.contains(g) {
+                        Text(g).tag(g)
+                    }
+                }
+                Text("New...").tag("New...")
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            
+            if showingNewGlazeField {
+                TextField("Glaze name", text: $newGlazeName, onCommit: {
+                    if !newGlazeName.isEmpty && !glazes.contains(newGlazeName) {
+                        glazes.append(newGlazeName)
+                        newGlazeName = ""
+                        showingNewGlazeField = false
+                    }
+                })
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 150)
+                
+                Button {
+                    showingNewGlazeField = false
+                    newGlazeName = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            Spacer()
+        }
+    }
+    
+    @ViewBuilder
+    private var remindersSection: some View {
+        Section {
+            Toggle("Reminder to Trim", isOn: $enableTrimReminder)
+            
+            if enableTrimReminder {
+                HStack {
+                    Text("Days after created")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    TextField("Days", value: $trimReminderDays, format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+        } header: {
+            Text("🔔 Reminders").font(.footnote).bold().foregroundStyle(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private var photosSection: some View {
+        Section {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    if let entry = entry {
+                        ForEach(entry.photos) { photo in
+                            PhotoThumbnail(photo: photo) {
+                                deletePhoto(photo, from: entry)
+                            }
+                        }
+                    }
+                    
+                    ForEach(temporaryPhotos) { photo in
+                        PhotoThumbnail(photo: photo) {
+                            deleteTemporaryPhoto(photo)
+                        }
+                    }
+                    
+                    PhotosPicker(selection: $selectedItem, matching: .images) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.secondary.opacity(0.1))
+                                .frame(width: 100, height: 100)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5]))
+                                        .foregroundStyle(.secondary)
+                                )
+                            Image(systemName: "plus")
+                                .font(.largeTitle)
+                                .foregroundStyle(.tint)
+                        }
+                    }
+                    .onChange(of: selectedItem) { oldValue, newValue in
+                        if let newValue = newValue {
+                            path.append(PhotoDraft(item: newValue))
+                            selectedItem = nil
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+        } header: {
+            Text("📸 Photos").font(.footnote).bold().foregroundStyle(.secondary)
+        }
     }
 
     struct PhotoDraft: Identifiable, Hashable {
@@ -273,6 +391,10 @@ struct EntryFormView: View {
         }
     }
 
+    private var uniqueGlazes: [String] {
+        Array(Set(allEntries.flatMap { $0.glazes })).filter { !$0.isEmpty }.sorted()
+    }
+
     private func save() {
         do {
             let savedEntry: PotteryEntry
@@ -281,8 +403,8 @@ struct EntryFormView: View {
                 entry.date = date
                 entry.dateTrimmed = dateTrimmed
                 entry.dateGlazed = dateGlazed
-                entry.reminderDaysAfterCreated = reminderAfterCreated
-                entry.reminderDaysAfterTrimmed = reminderAfterTrimmed
+                entry.enableTrimReminder = enableTrimReminder
+                entry.trimReminderDays = trimReminderDays
                 
                 entry.clayType = clayType
                 entry.clayWeight = clayWeight
@@ -297,8 +419,8 @@ struct EntryFormView: View {
                 let newEntry = PotteryEntry(name: name, date: date)
                 newEntry.dateTrimmed = dateTrimmed
                 newEntry.dateGlazed = dateGlazed
-                newEntry.reminderDaysAfterCreated = reminderAfterCreated
-                newEntry.reminderDaysAfterTrimmed = reminderAfterTrimmed
+                newEntry.enableTrimReminder = enableTrimReminder
+                newEntry.trimReminderDays = trimReminderDays
                 
                 newEntry.clayType = clayType
                 newEntry.clayWeight = clayWeight
@@ -350,42 +472,25 @@ struct EntryFormView: View {
         
         // Remove existing notifications for this entry
         center.removePendingNotificationRequests(withIdentifiers: [
-            "\(entry.id.uuidString)-created",
-            "\(entry.id.uuidString)-trimmed"
+            "\(entry.id.uuidString)-trim"
         ])
+        
+        guard entry.enableTrimReminder else { return }
         
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
             guard granted else { return }
             
-            // Reminder after Created
-            if let days = entry.reminderDaysAfterCreated, days >= 0 {
-                let content = UNMutableNotificationContent()
-                content.title = "Pottery Reminder"
-                content.body = "Time to check on \"\(entry.name)\"! It was created \(days) days ago."
-                content.sound = .default
-                
-                let triggerDate = Calendar.current.date(byAdding: .day, value: days, to: entry.date) ?? entry.date
-                let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
-                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-                
-                let request = UNNotificationRequest(identifier: "\(entry.id.uuidString)-created", content: content, trigger: trigger)
-                center.add(request)
-            }
+            let content = UNMutableNotificationContent()
+            content.title = "Pottery Reminder"
+            content.body = "Time to trim \"\(entry.name)\"! It was created \(entry.trimReminderDays) days ago."
+            content.sound = .default
             
-            // Reminder after Trimmed
-            if let days = entry.reminderDaysAfterTrimmed, let trimDate = entry.dateTrimmed, days >= 0 {
-                let content = UNMutableNotificationContent()
-                content.title = "Pottery Reminder"
-                content.body = "Time to check on \"\(entry.name)\"! It was trimmed \(days) days ago."
-                content.sound = .default
-                
-                let triggerDate = Calendar.current.date(byAdding: .day, value: days, to: trimDate) ?? trimDate
-                let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
-                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-                
-                let request = UNNotificationRequest(identifier: "\(entry.id.uuidString)-trimmed", content: content, trigger: trigger)
-                center.add(request)
-            }
+            let triggerDate = Calendar.current.date(byAdding: .day, value: entry.trimReminderDays, to: entry.date) ?? entry.date
+            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            
+            let request = UNNotificationRequest(identifier: "\(entry.id.uuidString)-trim", content: content, trigger: trigger)
+            center.add(request)
         }
     }
 }
@@ -457,3 +562,4 @@ struct OptionalDatePickerRow: View {
         }
     }
 }
+

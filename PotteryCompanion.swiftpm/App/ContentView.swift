@@ -18,7 +18,7 @@ struct ContentView: View {
         if !searchText.isEmpty {
             result = result.filter {
                 $0.name.localizedCaseInsensitiveContains(searchText) ||
-                // 1b. Search tags (keeping this as it's useful for "Greenware" etc)
+                $0.glazes.contains { $0.localizedCaseInsensitiveContains(searchText) } ||
                 $0.photos.contains { photo in photo.stageTag.localizedCaseInsensitiveContains(searchText) }
             }
         }
@@ -269,16 +269,6 @@ struct PotteryCardView: View {
                         .foregroundStyle(statusColor(for: entry.status))
                         .clipShape(Capsule())
                     
-                    // Clay Type Tag
-                    if !entry.clayType.isEmpty {
-                        Text(entry.clayType)
-                            .font(.footnote).fontWeight(.semibold)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Color.primary.opacity(0.1))
-                            .foregroundStyle(Color.primary)
-                            .clipShape(Capsule())
-                    }
                 }
                 .padding(.top, 2)
             }
@@ -295,11 +285,13 @@ struct PotteryCardView: View {
     }
     
     private func statusColor(for status: String) -> Color {
-        switch status {
-        case "In Progress": return .orange
-        case "Completed": return .green
-        case "Stopped": return .secondary
-        default: return .blue
+        guard let stage = PotteryStage(rawValue: status) else { return .blue }
+        switch stage {
+        case .greenware: return .green
+        case .trimmed: return .orange
+        case .bisque: return .brown
+        case .glazed: return .purple
+        case .finished: return .blue
         }
     }
 }

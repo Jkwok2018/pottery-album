@@ -23,13 +23,13 @@ final class PotteryEntry {
     var dateTrimmed: Date?
     var dateGlazed: Date?
     
-    // Reminders (days after event)
-    var reminderDaysAfterCreated: Int?
-    var reminderDaysAfterTrimmed: Int?
+    // Simplified Trim Reminder
+    var enableTrimReminder: Bool = false
+    var trimReminderDays: Int = 3
     
     var clayType: String // Keeping non-optional string for simplicity, empty string = none
     var clayWeight: Double? // in pounds
-    var glazes: String
+    var glazes: [String]
     var notes: String
     
     // Dimensions
@@ -45,10 +45,12 @@ final class PotteryEntry {
         self.date = date
         self.clayType = ""
         // clayWeight is optional, defaults to nil
-        self.glazes = ""
+        self.glazes = []
         self.notes = ""
         self.shape = ""
         self.status = PotteryStage.greenware.rawValue
+        self.enableTrimReminder = false
+        self.trimReminderDays = 3
     }
     
     func updateStatusFromPhotos() {
