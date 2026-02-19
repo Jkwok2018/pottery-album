@@ -123,7 +123,7 @@ struct ContentView: View {
                 .modelContext(modelContext)
             }
             .navigationDestination(for: PotteryEntry.self) { entry in
-                EntryDetailView(entry: entry)
+                EntryDetailView(entry: entry, path: $path)
             }
             .sheet(isPresented: $showingFilterSheet) {
                 NavigationStack {

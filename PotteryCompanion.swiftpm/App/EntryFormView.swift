@@ -109,6 +109,7 @@ struct EntryFormView: View {
                             temporaryPhotos.append(newPhoto)
                             updateStatusFromTemporaryPhotos()
                         }
+                        path.removeLast()
                     }
                 }
                 .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)
@@ -131,14 +132,20 @@ struct EntryFormView: View {
                 }
                 .onChange(of: selectedItem) { oldValue, newValue in
                     if let newValue = newValue {
-                        path.append(PhotoDraft(item: newValue))
+                        let draft = PhotoDraft(item: newValue)
+                        DispatchQueue.main.async {
+                            path.append(draft)
+                        }
                         selectedItem = nil
                     }
                 }
                 .sheet(isPresented: $showingCamera) {
                     ImagePicker { image in
                         if let data = image.jpegData(compressionQuality: 0.8) {
-                            path.append(PhotoDraft(data: data))
+                            let draft = PhotoDraft(data: data)
+                            DispatchQueue.main.async {
+                                path.append(draft)
+                            }
                         }
                     }
                 }

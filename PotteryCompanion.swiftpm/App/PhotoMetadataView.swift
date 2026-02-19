@@ -11,7 +11,6 @@ struct PhotoMetadataView: View {
     @State private var note = ""
     let stages = PotteryStage.allCases
     
-    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         Form {

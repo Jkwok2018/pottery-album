@@ -4,10 +4,10 @@ import PhotosUI
 
 struct EntryDetailView: View {
     @Bindable var entry: PotteryEntry
+    @Binding var path: NavigationPath
     @State private var isEditing = false
     @State private var selectedPhoto: PotteryPhoto?
     @State private var selectedItem: PhotosUI.PhotosPickerItem?
-    @State private var pendingPhoto: EntryFormView.PhotoDraft?
     
     @State private var showingCamera = false
     @State private var showingNewGlazeField = false
@@ -64,26 +64,32 @@ struct EntryDetailView: View {
         .sheet(isPresented: $isEditing) {
             EntryFormView(entry: entry)
         }
-        .navigationDestination(item: $pendingPhoto) { draft in
+        .navigationDestination(for: EntryFormView.PhotoDraft.self) { draft in
             PhotoMetadataView(item: draft.item, preloadedData: draft.preloadedData) { data, tag, note in
                 let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note, orderIndex: entry.photos.count)
                 entry.photos.append(newPhoto)
                 entry.updateStatusFromPhotos()
                 selectedPhoto = newPhoto
                 selectedItem = nil
-                pendingPhoto = nil
+                path.removeLast()
             }
         }
         .onChange(of: selectedItem) { oldValue, newValue in
             if let newValue = newValue {
-                pendingPhoto = EntryFormView.PhotoDraft(item: newValue)
+                let draft = EntryFormView.PhotoDraft(item: newValue)
+                DispatchQueue.main.async {
+                    path.append(draft)
+                }
                 selectedItem = nil
             }
         }
         .sheet(isPresented: $showingCamera) {
             ImagePicker { image in
                 if let data = image.jpegData(compressionQuality: 0.8) {
-                    pendingPhoto = EntryFormView.PhotoDraft(data: data)
+                    let draft = EntryFormView.PhotoDraft(data: data)
+                    DispatchQueue.main.async {
+                        path.append(draft)
+                    }
                 }
             }
         }

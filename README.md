@@ -6,6 +6,7 @@
     - [ ] have a profile tab
     - [ ] have a clay stock tab
     - [ ] refactor shared code
+    - [ ] tests
 - [ ] storing data safely
 - [ ] **Authentication**: Set up user accounts/login.
 - [ ] **Sharing**: (Stretch) Share entries with others.
