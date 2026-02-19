@@ -9,6 +9,7 @@ struct EntryDetailView: View {
     @State private var selectedItem: PhotosUI.PhotosPickerItem?
     @State private var pendingPhoto: EntryFormView.PhotoDraft?
     
+    @State private var showingCamera = false
     @State private var showingNewGlazeField = false
     @State private var newGlazeName = ""
     
@@ -42,7 +43,7 @@ struct EntryDetailView: View {
             EntryFormView(entry: entry)
         }
         .navigationDestination(item: $pendingPhoto) { draft in
-            PhotoMetadataView(item: draft.item) { data, tag, note in
+            PhotoMetadataView(item: draft.item, preloadedData: draft.preloadedData) { data, tag, note in
                 let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note)
                 entry.photos.append(newPhoto)
                 entry.updateStatusFromPhotos()
@@ -54,6 +55,13 @@ struct EntryDetailView: View {
         .onChange(of: selectedItem) { oldValue, newValue in
             if let newValue = newValue {
                 pendingPhoto = EntryFormView.PhotoDraft(item: newValue)
+            }
+        }
+        .sheet(isPresented: $showingCamera) {
+            ImagePicker { image in
+                if let data = image.jpegData(compressionQuality: 0.8) {
+                    pendingPhoto = EntryFormView.PhotoDraft(data: data)
+                }
             }
         }
     }
@@ -139,7 +147,17 @@ struct EntryDetailView: View {
                             }
                         }
                         
-                        PhotosPicker(selection: $selectedItem, matching: .images) {
+                        Menu {
+                            Button {
+                                showingCamera = true
+                            } label: {
+                                Label("Take Photo", systemImage: "camera")
+                            }
+                            
+                            PhotosPicker(selection: $selectedItem, matching: .images) {
+                                Label("Choose from Library", systemImage: "photo.on.rectangle")
+                            }
+                        } label: {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color(uiColor: .tertiarySystemBackground))

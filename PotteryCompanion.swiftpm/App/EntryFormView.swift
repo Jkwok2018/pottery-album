@@ -37,6 +37,7 @@ struct EntryFormView: View {
     
     // Photo State
     @State private var selectedItem: PhotosUI.PhotosPickerItem?
+    @State private var showingCamera = false
     @State private var temporaryPhotos: [PotteryPhoto] = []
     
     @State private var enteringNewClayType = false
@@ -90,7 +91,7 @@ struct EntryFormView: View {
                     }
                 }
                 .navigationDestination(for: PhotoDraft.self) { draft in
-                    PhotoMetadataView(item: draft.item) { data, tag, note in
+                    PhotoMetadataView(item: draft.item, preloadedData: draft.preloadedData) { data, tag, note in
                         let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note)
                         if let entry = entry {
                             entry.photos.append(newPhoto)
@@ -373,7 +374,17 @@ struct EntryFormView: View {
                         }
                     }
                     
-                    PhotosPicker(selection: $selectedItem, matching: .images) {
+                    Menu {
+                        Button {
+                            showingCamera = true
+                        } label: {
+                            Label("Take Photo", systemImage: "camera")
+                        }
+                        
+                        PhotosPicker(selection: $selectedItem, matching: .images) {
+                            Label("Choose from Library", systemImage: "photo.on.rectangle")
+                        }
+                    } label: {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(Color.secondary.opacity(0.1))
@@ -394,6 +405,13 @@ struct EntryFormView: View {
                             selectedItem = nil
                         }
                     }
+                    .sheet(isPresented: $showingCamera) {
+                        ImagePicker { image in
+                            if let data = image.jpegData(compressionQuality: 0.8) {
+                                path.append(PhotoDraft(data: data))
+                            }
+                        }
+                    }
                 }
                 .padding(.vertical, 8)
             }
@@ -405,7 +423,18 @@ struct EntryFormView: View {
 
     struct PhotoDraft: Identifiable, Hashable {
         let id = UUID()
-        let item: PhotosUI.PhotosPickerItem
+        let item: PhotosUI.PhotosPickerItem?
+        let preloadedData: Data?
+        
+        init(item: PhotosUI.PhotosPickerItem) {
+            self.item = item
+            self.preloadedData = nil
+        }
+        
+        init(data: Data) {
+            self.item = nil
+            self.preloadedData = data
+        }
         
         func hash(into hasher: inout Hasher) {
             hasher.combine(id)

@@ -2,7 +2,8 @@ import SwiftUI
 import PhotosUI
 
 struct PhotoMetadataView: View {
-    let item: PhotosUI.PhotosPickerItem
+    var item: PhotosUI.PhotosPickerItem? = nil
+    var preloadedData: Data? = nil
     var onSave: (Data, String, String) -> Void
     
     @State private var imageData: Data?
@@ -15,7 +16,7 @@ struct PhotoMetadataView: View {
     var body: some View {
         Form {
             Section {
-                if let imageData = imageData, let uiImage = UIImage(data: imageData) {
+                if let imageData = imageData ?? preloadedData, let uiImage = UIImage(data: imageData) {
                     Image(uiImage: uiImage)
                         .resizable()
                         .scaledToFit()
@@ -40,7 +41,7 @@ struct PhotoMetadataView: View {
                 }
                 
                 TextField("Add a note...", text: $note)
-                    .disabled(imageData == nil)
+                    .disabled(imageData == nil && preloadedData == nil)
             } header: {
                 Text("Details").font(.footnote).bold().foregroundStyle(.secondary)
             }
@@ -52,17 +53,24 @@ struct PhotoMetadataView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") {
-                    if let data = imageData {
+                    if let data = imageData ?? preloadedData {
                         onSave(data, selectedTag.rawValue, note)
                         dismiss()
                     }
                 }
-                .disabled(imageData == nil)
+                .disabled(imageData == nil && preloadedData == nil)
+            }
+        }
+        .onAppear {
+            if let preloadedData = preloadedData {
+                self.imageData = preloadedData
             }
         }
         .task {
-            if let data = try? await item.loadTransferable(type: Data.self) {
-                imageData = data
+            if let item = item, imageData == nil {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    imageData = data
+                }
             }
         }
     }

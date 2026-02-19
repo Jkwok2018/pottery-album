@@ -33,7 +33,8 @@ let package = Package(
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
             capabilities: [
-                .photoLibrary(purposeString: "Save and manage pottery photos")
+                .photoLibrary(purposeString: "Save and manage pottery photos"),
+                .camera(purposeString: "Take photos of your pottery pieces")
             ]
         )
     ],
