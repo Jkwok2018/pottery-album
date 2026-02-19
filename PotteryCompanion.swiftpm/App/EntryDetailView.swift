@@ -13,6 +13,9 @@ struct EntryDetailView: View {
     @State private var showingNewGlazeField = false
     @State private var newGlazeName = ""
     @State private var showingDeleteConfirmation = false
+    @State private var draggedPhoto: PotteryPhoto?
+    @State private var showingAddPhotoOptions = false
+    @State private var showingPhotosPicker = false
     
     @Query private var allEntries: [PotteryEntry]
     
@@ -35,6 +38,9 @@ struct EntryDetailView: View {
             .padding(.bottom, 40)
         }
         .background(Color.appBackground)
+        .onTapGesture {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -51,7 +57,7 @@ struct EntryDetailView: View {
         }
         .navigationDestination(item: $pendingPhoto) { draft in
             PhotoMetadataView(item: draft.item, preloadedData: draft.preloadedData) { data, tag, note in
-                let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note)
+                let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note, orderIndex: entry.photos.count)
                 entry.photos.append(newPhoto)
                 entry.updateStatusFromPhotos()
                 selectedPhoto = newPhoto
@@ -62,6 +68,7 @@ struct EntryDetailView: View {
         .onChange(of: selectedItem) { oldValue, newValue in
             if let newValue = newValue {
                 pendingPhoto = EntryFormView.PhotoDraft(item: newValue)
+                selectedItem = nil
             }
         }
         .sheet(isPresented: $showingCamera) {
@@ -80,6 +87,7 @@ struct EntryDetailView: View {
         } message: {
             Text("Are you sure you want to delete '\(entry.name)'? This action cannot be undone.")
         }
+        .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)
     }
     
     // MARK: - Section Views
@@ -108,7 +116,7 @@ struct EntryDetailView: View {
                 ZStack {
                     Color(uiColor: .systemBackground)
                     
-                    if let photo = selectedPhoto ?? entry.photos.first,
+                    if let photo = selectedPhoto ?? entry.sortedPhotos.first,
                        let uiImage = UIImage(data: photo.imageData) {
                         Image(uiImage: uiImage)
                             .resizable()
@@ -130,7 +138,7 @@ struct EntryDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 
                 // Photo Notes/Caption
-                if let photo = selectedPhoto ?? entry.photos.first {
+                if let photo = selectedPhoto ?? entry.sortedPhotos.first {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "quote.bubble")
                             .foregroundStyle(.secondary)
@@ -145,7 +153,7 @@ struct EntryDetailView: View {
                 // Thumbnail Bar
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(entry.photos) { photo in
+                        ForEach(entry.sortedPhotos) { photo in
                             Button {
                                 selectedPhoto = photo
                             } label: {
@@ -157,22 +165,20 @@ struct EntryDetailView: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .stroke(selectedPhoto == photo || (selectedPhoto == nil && photo == entry.photos.first) ? Color.primary : Color.clear, lineWidth: 2)
+                                                .stroke(selectedPhoto == photo || (selectedPhoto == nil && photo == entry.sortedPhotos.first) ? Color.primary : Color.clear, lineWidth: 2)
                                         )
+                                        .opacity(draggedPhoto == photo ? 0.5 : 1.0)
                                 }
                             }
+                            .onDrag {
+                                self.draggedPhoto = photo
+                                return NSItemProvider(object: photo.id.uuidString as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: movePhotos))
                         }
                         
-                        Menu {
-                            Button {
-                                showingCamera = true
-                            } label: {
-                                Label("Take Photo", systemImage: "camera")
-                            }
-                            
-                            PhotosPicker(selection: $selectedItem, matching: .images) {
-                                Label("Choose from Library", systemImage: "photo.on.rectangle")
-                            }
+                        Button {
+                            showingAddPhotoOptions = true
                         } label: {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
@@ -182,6 +188,15 @@ struct EntryDetailView: View {
                                     .font(.title3)
                                     .foregroundStyle(.secondary)
                             }
+                        }
+                        .confirmationDialog("Add Photo", isPresented: $showingAddPhotoOptions) {
+                            Button("Take Photo") {
+                                showingCamera = true
+                            }
+                            Button("Choose from Library") {
+                                showingPhotosPicker = true
+                            }
+                            Button("Cancel", role: .cancel) { }
                         }
                     }
                     .padding(.horizontal, 4)
@@ -494,6 +509,15 @@ struct EntryDetailView: View {
     
     private var uniqueGlazes: [String] {
         Array(Set(allEntries.flatMap { $0.glazes })).filter { !$0.isEmpty }.sorted()
+    }
+    
+    private func movePhotos(from source: IndexSet, to destination: Int) {
+        var revisedPhotos = entry.sortedPhotos
+        revisedPhotos.move(fromOffsets: source, toOffset: destination)
+        
+        for (index, photo) in revisedPhotos.enumerated() {
+            photo.orderIndex = index
+        }
     }
 }
 

@@ -39,6 +39,9 @@ struct EntryFormView: View {
     @State private var selectedItem: PhotosUI.PhotosPickerItem?
     @State private var showingCamera = false
     @State private var temporaryPhotos: [PotteryPhoto] = []
+    @State private var draggedPhoto: PotteryPhoto?
+    @State private var showingAddPhotoOptions = false
+    @State private var showingPhotosPicker = false
     
     @State private var enteringNewClayType = false
     @State private var enteringNewShape = false
@@ -94,10 +97,12 @@ struct EntryFormView: View {
                     PhotoMetadataView(item: draft.item, preloadedData: draft.preloadedData) { data, tag, note in
                         let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note)
                         if let entry = entry {
+                            newPhoto.orderIndex = entry.photos.count
                             entry.photos.append(newPhoto)
                             entry.updateStatusFromPhotos()
                             status = entry.status
                         } else {
+                            newPhoto.orderIndex = temporaryPhotos.count
                             temporaryPhotos.append(newPhoto)
                             updateStatusFromTemporaryPhotos()
                         }
@@ -108,6 +113,7 @@ struct EntryFormView: View {
                 }, message: {
                     Text(saveError?.localizedDescription ?? "Unknown error")
                 })
+                .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)
         }
     }
 
@@ -122,6 +128,9 @@ struct EntryFormView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.appBackground)
+        .onTapGesture {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
     }
     
     @ViewBuilder
@@ -361,10 +370,16 @@ struct EntryFormView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     if let entry = entry {
-                        ForEach(entry.photos) { photo in
+                        ForEach(entry.sortedPhotos) { photo in
                             PhotoThumbnail(photo: photo) {
                                 deletePhoto(photo, from: entry)
                             }
+                            .opacity(draggedPhoto == photo ? 0.5 : 1.0)
+                            .onDrag {
+                                self.draggedPhoto = photo
+                                return NSItemProvider(object: photo.id.uuidString as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: moveExistingPhotos))
                         }
                     }
                     
@@ -372,18 +387,16 @@ struct EntryFormView: View {
                         PhotoThumbnail(photo: photo) {
                             deleteTemporaryPhoto(photo)
                         }
+                        .opacity(draggedPhoto == photo ? 0.5 : 1.0)
+                        .onDrag {
+                            self.draggedPhoto = photo
+                            return NSItemProvider(object: photo.id.uuidString as NSString)
+                        }
+                        .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: temporaryPhotos, draggedItem: $draggedPhoto, onMove: moveTemporaryPhotos))
                     }
                     
-                    Menu {
-                        Button {
-                            showingCamera = true
-                        } label: {
-                            Label("Take Photo", systemImage: "camera")
-                        }
-                        
-                        PhotosPicker(selection: $selectedItem, matching: .images) {
-                            Label("Choose from Library", systemImage: "photo.on.rectangle")
-                        }
+                    Button {
+                        showingAddPhotoOptions = true
                     } label: {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
@@ -398,6 +411,15 @@ struct EntryFormView: View {
                                 .font(.largeTitle)
                                 .foregroundStyle(.tint)
                         }
+                    }
+                    .confirmationDialog("Add Photo", isPresented: $showingAddPhotoOptions) {
+                        Button("Take Photo") {
+                            showingCamera = true
+                        }
+                        Button("Choose from Library") {
+                            showingPhotosPicker = true
+                        }
+                        Button("Cancel", role: .cancel) { }
                     }
                     .onChange(of: selectedItem) { oldValue, newValue in
                         if let newValue = newValue {
@@ -482,7 +504,13 @@ struct EntryFormView: View {
                 newEntry.notes = notes
                 newEntry.shape = shape
                 newEntry.status = status
-                newEntry.photos = temporaryPhotos
+                
+                // Add temporary photos with correct order indices
+                for (index, photo) in temporaryPhotos.enumerated() {
+                    photo.orderIndex = index
+                    newEntry.photos.append(photo)
+                }
+                
                 modelContext.insert(newEntry)
                 
                 scheduleNotifications(for: newEntry)
@@ -544,8 +572,20 @@ struct EntryFormView: View {
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
             
             let request = UNNotificationRequest(identifier: "\(entry.id.uuidString)-trim", content: content, trigger: trigger)
-            center.add(request)
         }
+    }
+    
+    private func moveExistingPhotos(from source: IndexSet, to destination: Int) {
+        guard let entry = entry else { return }
+        var revisedPhotos = entry.sortedPhotos
+        revisedPhotos.move(fromOffsets: source, toOffset: destination)
+        for (index, photo) in revisedPhotos.enumerated() {
+            photo.orderIndex = index
+        }
+    }
+    
+    private func moveTemporaryPhotos(from source: IndexSet, to destination: Int) {
+        temporaryPhotos.move(fromOffsets: source, toOffset: destination)
     }
 }
 
