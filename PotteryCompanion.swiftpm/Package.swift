@@ -45,6 +45,11 @@ let package = Package(
             resources: [
                 .process("Assets.xcassets")
             ]
+        ),
+        .testTarget(
+            name: "AppModuleTests",
+            dependencies: ["AppModule"],
+            path: "Tests"
         )
     ]
 )
