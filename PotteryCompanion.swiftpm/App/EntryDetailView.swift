@@ -12,10 +12,12 @@ struct EntryDetailView: View {
     @State private var showingCamera = false
     @State private var showingNewGlazeField = false
     @State private var newGlazeName = ""
+    @State private var showingDeleteConfirmation = false
     
     @Query private var allEntries: [PotteryEntry]
     
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     
     @State private var enteringNewShape = false
     @State private var enteringNewClayType = false
@@ -36,7 +38,12 @@ struct EntryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                // No Edit button needed as fields are directly editable
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
             }
         }
         .sheet(isPresented: $isEditing) {
@@ -63,6 +70,15 @@ struct EntryDetailView: View {
                     pendingPhoto = EntryFormView.PhotoDraft(data: data)
                 }
             }
+        }
+        .alert("Delete Entry?", isPresented: $showingDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(entry)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to delete '\(entry.name)'? This action cannot be undone.")
         }
     }
     
