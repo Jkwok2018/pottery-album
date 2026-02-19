@@ -19,6 +19,7 @@ struct EntryDetailView: View {
     @State private var photoToDelete: PotteryPhoto?
     @State private var showingPhotoDeleteConfirmation = false
     @State private var isJiggling = false
+    @State private var pendingDraft: PhotoDraft?
     
     @Query private var allEntries: [PotteryEntry]
     
@@ -64,7 +65,7 @@ struct EntryDetailView: View {
         .sheet(isPresented: $isEditing) {
             EntryFormView(entry: entry)
         }
-        .navigationDestination(for: EntryFormView.PhotoDraft.self) { draft in
+        .navigationDestination(for: PhotoDraft.self) { draft in
             PhotoMetadataView(item: draft.item, preloadedData: draft.preloadedData) { data, tag, note in
                 let newPhoto = PotteryPhoto(imageData: data, stageTag: tag, note: note, orderIndex: entry.photos.count)
                 entry.photos.append(newPhoto)
@@ -76,20 +77,23 @@ struct EntryDetailView: View {
         }
         .onChange(of: selectedItem) { oldValue, newValue in
             if let newValue = newValue {
-                let draft = EntryFormView.PhotoDraft(item: newValue)
-                DispatchQueue.main.async {
-                    path.append(draft)
-                }
+                pendingDraft = PhotoDraft(item: newValue)
                 selectedItem = nil
+            }
+        }
+        .onChange(of: pendingDraft) { oldValue, newValue in
+            if let draft = newValue {
+                // Delay slightly to allow any pickers/sheets to fully dismiss
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    path.append(draft)
+                    pendingDraft = nil
+                }
             }
         }
         .sheet(isPresented: $showingCamera) {
             ImagePicker { image in
                 if let data = image.jpegData(compressionQuality: 0.8) {
-                    let draft = EntryFormView.PhotoDraft(data: data)
-                    DispatchQueue.main.async {
-                        path.append(draft)
-                    }
+                    pendingDraft = PhotoDraft(data: data)
                 }
             }
         }
@@ -184,53 +188,32 @@ struct EntryDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(entry.sortedPhotos) { photo in
-                            ZStack(alignment: .topTrailing) {
-                                Button {
-                                    if !isJiggling {
-                                        selectedPhoto = photo
-                                    }
-                                } label: {
-                                    if let uiImage = UIImage(data: photo.imageData) {
-                                        Image(uiImage: uiImage)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 55, height: 55)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(selectedPhoto == photo || (selectedPhoto == nil && photo == entry.sortedPhotos.first) ? Color.primary : Color.clear, lineWidth: 2)
-                                            )
-                                            .opacity(draggedPhoto == photo ? 0.5 : 1.0)
-                                    }
-                                }
-                                .jiggle(isActive: isJiggling)
-                                .onDrag {
-                                    self.draggedPhoto = photo
-                                    return NSItemProvider(object: photo.id.uuidString as NSString)
-                                }
-                                .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: movePhotos))
-                                .simultaneousGesture(
-                                    LongPressGesture(minimumDuration: 0.5)
-                                        .onEnded { _ in
-                                            withAnimation {
-                                                isJiggling = true
-                                            }
-                                        }
-                                )
-                                
-                                if isJiggling {
-                                    Button {
+                            GalleryThumbnail(
+                                photo: photo,
+                                isSelected: photo == (selectedPhoto ?? entry.sortedPhotos.first),
+                                isJiggling: isJiggling,
+                                onAction: {
+                                    if isJiggling {
                                         photoToDelete = photo
                                         showingPhotoDeleteConfirmation = true
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundStyle(.white, .red)
-                                            .font(.caption)
+                                    } else {
+                                        selectedPhoto = photo
                                     }
-                                    .padding(-4)
-                                    .transition(.scale.combined(with: .opacity))
                                 }
+                            )
+                            .onDrag {
+                                self.draggedPhoto = photo
+                                return NSItemProvider(object: photo.id.uuidString as NSString)
                             }
+                            .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: movePhotos))
+                            .simultaneousGesture(
+                                LongPressGesture(minimumDuration: 0.5)
+                                    .onEnded { _ in
+                                        withAnimation {
+                                            isJiggling = true
+                                        }
+                                    }
+                            )
                         }
                         
                         Button {
@@ -321,39 +304,13 @@ struct EntryDetailView: View {
     
     @ViewBuilder
     private var shapePickerRow: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Shape")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker("", selection: Binding(
-                    get: { enteringNewShape ? "Other" : (uniqueShapes.contains(entry.shape) ? entry.shape : "Other") },
-                    set: { newValue in
-                        if newValue == "Other" {
-                            enteringNewShape = true
-                        } else {
-                            enteringNewShape = false
-                            entry.shape = newValue
-                        }
-                    }
-                )) {
-                    ForEach(uniqueShapes, id: \.self) { s in
-                        Text(s).tag(s)
-                    }
-                    Text("New...").tag("Other")
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-            }
-            .padding()
-            
-            if enteringNewShape || !uniqueShapes.contains(entry.shape) || entry.shape.isEmpty {
-                Divider().padding(.horizontal)
-                TextField("Enter new shape", text: $entry.shape)
-                    .padding()
-                    .background(Color(uiColor: .tertiarySystemFill).opacity(0.3))
-            }
-        }
+        SuggestionPickerRow(
+            label: "Shape",
+            value: $entry.shape,
+            suggestions: uniqueShapes,
+            enteringOther: $enteringNewShape
+        )
+        .padding()
     }
     
     @ViewBuilder
@@ -375,40 +332,14 @@ struct EntryDetailView: View {
     
     @ViewBuilder
     private var clayPickerRow: some View {
-        VStack(spacing: 0) {
-            Divider().padding(.horizontal)
-            HStack {
-                Text("Clay")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker("", selection: Binding(
-                    get: { enteringNewClayType ? "Other" : (uniqueClayTypes.contains(entry.clayType) ? entry.clayType : "Other") },
-                    set: { newValue in
-                        if newValue == "Other" {
-                            enteringNewClayType = true
-                        } else {
-                            enteringNewClayType = false
-                            entry.clayType = newValue
-                        }
-                    }
-                )) {
-                    ForEach(uniqueClayTypes, id: \.self) { t in
-                        Text(t).tag(t)
-                    }
-                    Text("New...").tag("Other")
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-            }
-            .padding()
-            
-            if enteringNewClayType || !uniqueClayTypes.contains(entry.clayType) || entry.clayType.isEmpty {
-                Divider().padding(.horizontal)
-                TextField("Enter new clay type", text: $entry.clayType)
-                    .padding()
-                    .background(Color(uiColor: .tertiarySystemFill).opacity(0.3))
-            }
-        }
+        Divider().padding(.horizontal)
+        SuggestionPickerRow(
+            label: "Clay",
+            value: $entry.clayType,
+            suggestions: uniqueClayTypes,
+            enteringOther: $enteringNewClayType
+        )
+        .padding()
     }
     
     @ViewBuilder
@@ -482,20 +413,9 @@ struct EntryDetailView: View {
             if !entry.glazes.isEmpty {
                 FlowLayout(spacing: 8) {
                     ForEach(entry.glazes, id: \.self) { glaze in
-                        HStack(spacing: 4) {
-                            Text(glaze)
-                                .font(.subheadline)
-                            Button {
-                                entry.glazes.removeAll { $0 == glaze }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.caption)
-                            }
+                        GlazeTag(name: glaze) {
+                            entry.glazes.removeAll { $0 == glaze }
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.tint.opacity(0.1))
-                        .clipShape(Capsule())
                     }
                 }
             }
@@ -577,20 +497,24 @@ struct EntryDetailView: View {
     }
 }
 
-
-struct EditableDetailRow: View {
-    let label: String
-    @Binding var value: String
+private struct GalleryThumbnail: View {
+    let photo: PotteryPhoto
+    let isSelected: Bool
+    let isJiggling: Bool
+    let onAction: () -> Void
     
     var body: some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
-            TextField("None", text: $value)
-                .multilineTextAlignment(.trailing)
-                .fontWeight(.medium)
-        }
-        .padding()
+        PhotoThumbnail(
+            photo: photo,
+            isJiggling: isJiggling,
+            showTag: false,
+            onDelete: onAction,
+            size: 55
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? Color.primary : Color.clear, lineWidth: 2)
+        )
+        .onTapGesture(perform: onAction)
     }
 }

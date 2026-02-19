@@ -45,6 +45,7 @@ struct EntryFormView: View {
     @State private var isJiggling = false
     @State private var photoToDelete: PotteryPhoto?
     @State private var showingPhotoDeleteConfirmation = false
+    @State private var pendingDraft: PhotoDraft?
     
     @State private var enteringNewClayType = false
     @State private var enteringNewShape = false
@@ -132,37 +133,50 @@ struct EntryFormView: View {
                 }
                 .onChange(of: selectedItem) { oldValue, newValue in
                     if let newValue = newValue {
-                        let draft = PhotoDraft(item: newValue)
-                        DispatchQueue.main.async {
-                            path.append(draft)
-                        }
+                        pendingDraft = PhotoDraft(item: newValue)
                         selectedItem = nil
+                    }
+                }
+                .onChange(of: pendingDraft) { oldValue, newValue in
+                    if let draft = newValue {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            path.append(draft)
+                            pendingDraft = nil
+                        }
                     }
                 }
                 .sheet(isPresented: $showingCamera) {
                     ImagePicker { image in
                         if let data = image.jpegData(compressionQuality: 0.8) {
-                            let draft = PhotoDraft(data: data)
-                            DispatchQueue.main.async {
-                                path.append(draft)
-                            }
+                            pendingDraft = PhotoDraft(data: data)
                         }
                     }
+                }
+                .confirmationDialog("Add Photo", isPresented: $showingAddPhotoOptions) {
+                    Button("Take Photo") {
+                        showingCamera = true
+                    }
+                    Button("Choose from Library") {
+                        showingPhotosPicker = true
+                    }
+                    Button("Cancel", role: .cancel) { }
                 }
         }
     }
 
     @ViewBuilder
     private var formContent: some View {
-        Form {
-            generalInfoSection
-            specsSection
-            processSection
-            photosSection
-            remindersSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                generalInfoSection
+                specsSection
+                notesSection
+                photosSection
+                remindersSection
+            }
+            .padding(.bottom, 40)
         }
-        .scrollContentBackground(.hidden)
-        .background(Color.appBackground)
+        .scrollDismissesKeyboard(.immediately)
         .contentShape(Rectangle())
         .onTapGesture {
             if isJiggling {
@@ -176,115 +190,104 @@ struct EntryFormView: View {
     
     @ViewBuilder
     private var generalInfoSection: some View {
-        Section {
-            TextField("Title (e.g., Blue Bowl)", text: $name)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("📝 GENERAL INFO")
+                .font(.footnote).bold()
+                .foregroundStyle(.secondary)
+                .padding(.leading, 8)
             
-            HStack {
-                Text("Status")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker("", selection: $status) {
-                    ForEach(PotteryStage.allCases, id: \.self) { stage in
-                        Text(stage.rawValue).tag(stage.rawValue)
+            VStack(spacing: 0) {
+                TextField("Title (e.g., Blue Bowl)", text: $name)
+                    .font(.title2.bold())
+                    .padding()
+                
+                Divider().padding(.horizontal)
+                
+                HStack {
+                    Text("Status")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("", selection: $status) {
+                        ForEach(PotteryStage.allCases, id: \.self) { stage in
+                            Text(stage.rawValue).tag(stage.rawValue)
+                        }
                     }
-                }
-                .labelsHidden()
-            }
-            
-            HStack {
-                Text("Date Created")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                DatePicker("", selection: $date, displayedComponents: .date)
                     .labelsHidden()
+                    .pickerStyle(.menu)
+                }
+                .padding()
+                
+                Divider().padding(.horizontal)
+                
+                HStack {
+                    Text("Date Created")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    DatePicker("", selection: $date, displayedComponents: .date)
+                        .labelsHidden()
+                }
+                .padding()
+                
+                Divider().padding(.horizontal)
+                OptionalDatePickerRow(label: "Date Trimmed", selection: $dateTrimmed)
+                    .padding()
+                Divider().padding(.horizontal)
+                OptionalDatePickerRow(label: "Date Glazed", selection: $dateGlazed)
+                    .padding()
             }
-            OptionalDatePickerRow(label: "Date Trimmed", selection: $dateTrimmed)
-            OptionalDatePickerRow(label: "Date Glazed", selection: $dateGlazed)
-        } header: {
-            Text("📝 General Info").font(.footnote).bold().foregroundStyle(.secondary)
+            .background(Color(uiColor: .systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
     private var specsSection: some View {
-        Section {
-            shapePicker
-            clayTypePicker
-            weightField
-            glazeManagementView
-        } header: {
-            Text("🏗️ Specs").font(.footnote).bold().foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("🏗️ SPECS")
+                .font(.footnote).bold()
+                .foregroundStyle(.secondary)
+                .padding(.leading, 8)
+            
+            VStack(spacing: 0) {
+                shapePicker
+                clayTypePicker
+                weightField
+                Divider().padding(.horizontal)
+                glazeManagementView
+            }
+            .background(Color(uiColor: .systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
     private var clayTypePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Clay Type")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker("", selection: Binding(
-                    get: { enteringNewClayType ? "Other" : (uniqueClayTypes.contains(clayType) ? clayType : "Other") },
-                    set: { newValue in
-                        if newValue == "Other" {
-                            enteringNewClayType = true
-                        } else {
-                            enteringNewClayType = false
-                            clayType = newValue
-                        }
-                    }
-                )) {
-                    ForEach(uniqueClayTypes, id: \.self) { type in
-                        Text(type).tag(type)
-                    }
-                    Text("New Type...").tag("Other")
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-            }
-            
-            if enteringNewClayType || !uniqueClayTypes.contains(clayType) || clayType.isEmpty {
-                TextField("Enter new clay type", text: $clayType)
-            }
-        }
+        Divider().padding(.horizontal)
+        SuggestionPickerRow(
+            label: "Clay Type",
+            value: $clayType,
+            suggestions: uniqueClayTypes,
+            enteringOther: $enteringNewClayType
+        )
+        .padding()
     }
     
     @ViewBuilder
     private var shapePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Shape")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker("", selection: Binding(
-                    get: { enteringNewShape ? "Other" : (uniqueShapes.contains(shape) ? shape : "Other") },
-                    set: { newValue in
-                        if newValue == "Other" {
-                            enteringNewShape = true
-                        } else {
-                            enteringNewShape = false
-                            shape = newValue
-                        }
-                    }
-                )) {
-                    ForEach(uniqueShapes, id: \.self) { s in
-                        Text(s).tag(s)
-                    }
-                    Text("New Shape...").tag("Other")
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-            }
-            
-            if enteringNewShape || !uniqueShapes.contains(shape) || shape.isEmpty {
-                TextField("Enter new shape (e.g., Mug)", text: $shape)
-            }
-        }
+        SuggestionPickerRow(
+            label: "Shape",
+            value: $shape,
+            suggestions: uniqueShapes,
+            enteringOther: $enteringNewShape
+        )
+        .padding()
     }
     
     @ViewBuilder
     private var weightField: some View {
+        Divider().padding(.horizontal)
         HStack {
             Text("Weight (lbs)")
                 .foregroundStyle(.secondary)
@@ -293,24 +296,34 @@ struct EntryFormView: View {
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
         }
+        .padding()
     }
     
     @ViewBuilder
-    private var processSection: some View {
-        Section {
-            TextField("Notes", text: $notes, axis: .vertical)
-                .lineLimit(3...6)
-        } header: {
-            Text("📓 Notes").font(.footnote).bold().foregroundStyle(.secondary)
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("📓 NOTES")
+                .font(.footnote).bold()
+                .foregroundStyle(.secondary)
+                .padding(.leading, 8)
+            
+            TextEditor(text: $notes)
+                .font(.body)
+                .padding(8)
+                .frame(minHeight: 120)
+                .background(Color(uiColor: .systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
     private var glazeManagementView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            glazeFlowList
             glazePickerRow
+            glazeFlowList
         }
+        .padding()
     }
     
     @ViewBuilder
@@ -318,20 +331,9 @@ struct EntryFormView: View {
         if !glazes.isEmpty {
             FlowLayout(spacing: 8) {
                 ForEach(glazes, id: \.self) { glaze in
-                    HStack(spacing: 4) {
-                        Text(glaze)
-                            .font(.subheadline)
-                        Button {
-                            glazes.removeAll { $0 == glaze }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.caption)
-                        }
+                    GlazeTag(name: glaze) {
+                        glazes.removeAll { $0 == glaze }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.tint.opacity(0.1))
-                    .clipShape(Capsule())
                 }
             }
         }
@@ -387,31 +389,71 @@ struct EntryFormView: View {
     
     @ViewBuilder
     private var remindersSection: some View {
-        Section {
-            Toggle("Reminder to Trim", isOn: $enableTrimReminder)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("🔔 REMINDERS")
+                .font(.footnote).bold()
+                .foregroundStyle(.secondary)
+                .padding(.leading, 8)
             
-            if enableTrimReminder {
-                HStack {
-                    Text("Days after created")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    TextField("Days", value: $trimReminderDays, format: .number)
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
+            VStack(spacing: 0) {
+                Toggle("Reminder to Trim", isOn: $enableTrimReminder)
+                    .padding()
+                
+                if enableTrimReminder {
+                    Divider().padding(.horizontal)
+                    HStack {
+                        Text("Days after created")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("Days", value: $trimReminderDays, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .padding()
                 }
             }
-        } header: {
-            Text("🔔 Reminders").font(.footnote).bold().foregroundStyle(.secondary)
+            .background(Color(uiColor: .systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
     private var photosSection: some View {
-        Section {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    if let entry = entry {
-                        ForEach(entry.sortedPhotos) { photo in
+        VStack(alignment: .leading, spacing: 8) {
+            Text("📸 PHOTOS")
+                .font(.footnote).bold()
+                .foregroundStyle(.secondary)
+                .padding(.leading, 8)
+            
+            VStack(alignment: .leading, spacing: 16) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        if let entry = entry {
+                            ForEach(entry.sortedPhotos) { photo in
+                                PhotoThumbnail(photo: photo, isJiggling: isJiggling) {
+                                    photoToDelete = photo
+                                    showingPhotoDeleteConfirmation = true
+                                }
+                                .jiggle(isActive: isJiggling)
+                                .opacity(draggedPhoto == photo ? 0.5 : 1.0)
+                                .onDrag {
+                                    self.draggedPhoto = photo
+                                    return NSItemProvider(object: photo.id.uuidString as NSString)
+                                }
+                                .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: moveExistingPhotos))
+                                .simultaneousGesture(
+                                    LongPressGesture(minimumDuration: 0.5)
+                                        .onEnded { _ in
+                                            withAnimation {
+                                                isJiggling = true
+                                            }
+                                        }
+                                )
+                            }
+                        }
+                        
+                        ForEach(temporaryPhotos) { photo in
                             PhotoThumbnail(photo: photo, isJiggling: isJiggling) {
                                 photoToDelete = photo
                                 showingPhotoDeleteConfirmation = true
@@ -422,7 +464,7 @@ struct EntryFormView: View {
                                 self.draggedPhoto = photo
                                 return NSItemProvider(object: photo.id.uuidString as NSString)
                             }
-                            .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: moveExistingPhotos))
+                            .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: temporaryPhotos, draggedItem: $draggedPhoto, onMove: moveTemporaryPhotos))
                             .simultaneousGesture(
                                 LongPressGesture(minimumDuration: 0.5)
                                     .onEnded { _ in
@@ -432,89 +474,34 @@ struct EntryFormView: View {
                                     }
                             )
                         }
-                    }
-                    
-                    ForEach(temporaryPhotos) { photo in
-                        PhotoThumbnail(photo: photo, isJiggling: isJiggling) {
-                            photoToDelete = photo
-                            showingPhotoDeleteConfirmation = true
+                        
+                        Button {
+                            showingAddPhotoOptions = true
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.secondary.opacity(0.1))
+                                    .frame(width: 100, height: 100)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5]))
+                                            .foregroundStyle(.secondary)
+                                    )
+                                Image(systemName: "plus")
+                                    .font(.largeTitle)
+                                    .foregroundStyle(.tint)
+                            }
                         }
-                        .jiggle(isActive: isJiggling)
-                        .opacity(draggedPhoto == photo ? 0.5 : 1.0)
-                        .onDrag {
-                            self.draggedPhoto = photo
-                            return NSItemProvider(object: photo.id.uuidString as NSString)
-                        }
-                        .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: temporaryPhotos, draggedItem: $draggedPhoto, onMove: moveTemporaryPhotos))
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.5)
-                                .onEnded { _ in
-                                    withAnimation {
-                                        isJiggling = true
-                                    }
-                                }
-                        )
-                    }
-                    
-                    Button {
-                        showingAddPhotoOptions = true
-                    } label: {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.secondary.opacity(0.1))
-                                .frame(width: 100, height: 100)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5]))
-                                        .foregroundStyle(.secondary)
-                                )
-                            Image(systemName: "plus")
-                                .font(.largeTitle)
-                                .foregroundStyle(.tint)
-                        }
-                    }
-                    .confirmationDialog("Add Photo", isPresented: $showingAddPhotoOptions) {
-                        Button("Take Photo") {
-                            showingCamera = true
-                        }
-                        Button("Choose from Library") {
-                            showingPhotosPicker = true
-                        }
-                        Button("Cancel", role: .cancel) { }
                     }
                 }
                 .padding(.vertical, 8)
             }
-            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-        } header: {
-            Text("📸 Photos").font(.footnote).bold().foregroundStyle(.secondary)
+            .padding(16)
+            .background(Color(uiColor: .systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
         }
+        .padding(.horizontal, 20)
     }
-
-    struct PhotoDraft: Identifiable, Hashable {
-        let id = UUID()
-        let item: PhotosUI.PhotosPickerItem?
-        let preloadedData: Data?
-        
-        init(item: PhotosUI.PhotosPickerItem) {
-            self.item = item
-            self.preloadedData = nil
-        }
-        
-        init(data: Data) {
-            self.item = nil
-            self.preloadedData = data
-        }
-        
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(id)
-        }
-        
-        static func == (lhs: PhotoDraft, rhs: PhotoDraft) -> Bool {
-            lhs.id == rhs.id
-        }
-    }
-
     private var uniqueGlazes: [String] {
         Array(Set(allEntries.flatMap { $0.glazes })).filter { !$0.isEmpty }.sorted()
     }
@@ -636,77 +623,3 @@ struct EntryFormView: View {
         temporaryPhotos.move(fromOffsets: source, toOffset: destination)
     }
 }
-
-struct PhotoThumbnail: View {
-    let photo: PotteryPhoto
-    var isJiggling: Bool = false
-    var onDelete: () -> Void
-    
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            if let uiImage = UIImage(data: photo.imageData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 100, height: 100)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            
-            Text(photo.stageTag)
-                .font(.caption2.bold())
-                .foregroundStyle(.white)
-                .padding(4)
-                .background(.black.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-                .padding(4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            
-            if isJiggling {
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.white, .red)
-                        .font(.title3)
-                }
-                .padding(-6)
-                .transition(.scale.combined(with: .opacity))
-            }
-        }
-        .frame(width: 100, height: 100)
-    }
-}
-
-struct OptionalDatePickerRow: View {
-    let label: String
-    @Binding var selection: Date?
-    
-    var body: some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
-            if let date = selection {
-                DatePicker("", selection: Binding(
-                    get: { date },
-                    set: { selection = $0 }
-                ), displayedComponents: .date)
-                .labelsHidden()
-                
-                Button {
-                    selection = nil
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.title3)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Button("Add Date") {
-                    selection = .now
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
