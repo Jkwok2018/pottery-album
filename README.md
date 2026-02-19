@@ -5,5 +5,7 @@
     - [ ] show count down in list view if notification is on
     - [ ] have a profile tab
     - [ ] have a clay stock tab
+    - [ ] refactor shared code
+- [ ] storing data safely
 - [ ] **Authentication**: Set up user accounts/login.
 - [ ] **Sharing**: (Stretch) Share entries with others.

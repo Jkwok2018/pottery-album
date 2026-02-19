@@ -48,6 +48,10 @@ struct PhotoMetadataView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.appBackground)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
         .navigationTitle("Tag Photo")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

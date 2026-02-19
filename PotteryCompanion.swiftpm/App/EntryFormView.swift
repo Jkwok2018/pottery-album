@@ -42,6 +42,9 @@ struct EntryFormView: View {
     @State private var draggedPhoto: PotteryPhoto?
     @State private var showingAddPhotoOptions = false
     @State private var showingPhotosPicker = false
+    @State private var isJiggling = false
+    @State private var photoToDelete: PotteryPhoto?
+    @State private var showingPhotoDeleteConfirmation = false
     
     @State private var enteringNewClayType = false
     @State private var enteringNewShape = false
@@ -108,12 +111,37 @@ struct EntryFormView: View {
                         }
                     }
                 }
+                .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)
                 .alert("Save Failed", isPresented: $showingError, actions: {
                     Button("OK", role: .cancel) { }
                 }, message: {
                     Text(saveError?.localizedDescription ?? "Unknown error")
                 })
-                .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)
+                .alert("Delete Photo?", isPresented: $showingPhotoDeleteConfirmation, presenting: photoToDelete) { photo in
+                    Button("Delete", role: .destructive) {
+                        if let entry = entry {
+                            deletePhoto(photo, from: entry)
+                        } else {
+                            deleteTemporaryPhoto(photo)
+                        }
+                    }
+                    Button("Cancel", role: .cancel) { }
+                } message: { _ in
+                    Text("Are you sure you want to remove this photo?")
+                }
+                .onChange(of: selectedItem) { oldValue, newValue in
+                    if let newValue = newValue {
+                        path.append(PhotoDraft(item: newValue))
+                        selectedItem = nil
+                    }
+                }
+                .sheet(isPresented: $showingCamera) {
+                    ImagePicker { image in
+                        if let data = image.jpegData(compressionQuality: 0.8) {
+                            path.append(PhotoDraft(data: data))
+                        }
+                    }
+                }
         }
     }
 
@@ -128,7 +156,13 @@ struct EntryFormView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.appBackground)
+        .contentShape(Rectangle())
         .onTapGesture {
+            if isJiggling {
+                withAnimation {
+                    isJiggling = false
+                }
+            }
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
     }
@@ -371,28 +405,48 @@ struct EntryFormView: View {
                 HStack(spacing: 12) {
                     if let entry = entry {
                         ForEach(entry.sortedPhotos) { photo in
-                            PhotoThumbnail(photo: photo) {
-                                deletePhoto(photo, from: entry)
+                            PhotoThumbnail(photo: photo, isJiggling: isJiggling) {
+                                photoToDelete = photo
+                                showingPhotoDeleteConfirmation = true
                             }
+                            .jiggle(isActive: isJiggling)
                             .opacity(draggedPhoto == photo ? 0.5 : 1.0)
                             .onDrag {
                                 self.draggedPhoto = photo
                                 return NSItemProvider(object: photo.id.uuidString as NSString)
                             }
                             .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: moveExistingPhotos))
+                            .simultaneousGesture(
+                                LongPressGesture(minimumDuration: 0.5)
+                                    .onEnded { _ in
+                                        withAnimation {
+                                            isJiggling = true
+                                        }
+                                    }
+                            )
                         }
                     }
                     
                     ForEach(temporaryPhotos) { photo in
-                        PhotoThumbnail(photo: photo) {
-                            deleteTemporaryPhoto(photo)
+                        PhotoThumbnail(photo: photo, isJiggling: isJiggling) {
+                            photoToDelete = photo
+                            showingPhotoDeleteConfirmation = true
                         }
+                        .jiggle(isActive: isJiggling)
                         .opacity(draggedPhoto == photo ? 0.5 : 1.0)
                         .onDrag {
                             self.draggedPhoto = photo
                             return NSItemProvider(object: photo.id.uuidString as NSString)
                         }
                         .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: temporaryPhotos, draggedItem: $draggedPhoto, onMove: moveTemporaryPhotos))
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5)
+                                .onEnded { _ in
+                                    withAnimation {
+                                        isJiggling = true
+                                    }
+                                }
+                        )
                     }
                     
                     Button {
@@ -420,19 +474,6 @@ struct EntryFormView: View {
                             showingPhotosPicker = true
                         }
                         Button("Cancel", role: .cancel) { }
-                    }
-                    .onChange(of: selectedItem) { oldValue, newValue in
-                        if let newValue = newValue {
-                            path.append(PhotoDraft(item: newValue))
-                            selectedItem = nil
-                        }
-                    }
-                    .sheet(isPresented: $showingCamera) {
-                        ImagePicker { image in
-                            if let data = image.jpegData(compressionQuality: 0.8) {
-                                path.append(PhotoDraft(data: data))
-                            }
-                        }
                     }
                 }
                 .padding(.vertical, 8)
@@ -591,6 +632,7 @@ struct EntryFormView: View {
 
 struct PhotoThumbnail: View {
     let photo: PotteryPhoto
+    var isJiggling: Bool = false
     var onDelete: () -> Void
     
     var body: some View {
@@ -612,12 +654,15 @@ struct PhotoThumbnail: View {
                 .padding(4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             
-            Button(action: onDelete) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.white, .red)
-                    .font(.title3)
+            if isJiggling {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.white, .red)
+                        .font(.title3)
+                }
+                .padding(-6)
+                .transition(.scale.combined(with: .opacity))
             }
-            .padding(-6)
         }
         .frame(width: 100, height: 100)
     }

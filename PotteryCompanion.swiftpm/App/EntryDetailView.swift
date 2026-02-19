@@ -16,6 +16,9 @@ struct EntryDetailView: View {
     @State private var draggedPhoto: PotteryPhoto?
     @State private var showingAddPhotoOptions = false
     @State private var showingPhotosPicker = false
+    @State private var photoToDelete: PotteryPhoto?
+    @State private var showingPhotoDeleteConfirmation = false
+    @State private var isJiggling = false
     
     @Query private var allEntries: [PotteryEntry]
     
@@ -38,7 +41,13 @@ struct EntryDetailView: View {
             .padding(.bottom, 40)
         }
         .background(Color.appBackground)
+        .contentShape(Rectangle())
         .onTapGesture {
+            if isJiggling {
+                withAnimation {
+                    isJiggling = false
+                }
+            }
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -88,6 +97,21 @@ struct EntryDetailView: View {
             Text("Are you sure you want to delete '\(entry.name)'? This action cannot be undone.")
         }
         .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)
+        .alert("Delete Photo?", isPresented: $showingPhotoDeleteConfirmation, presenting: photoToDelete) { photo in
+            Button("Delete", role: .destructive) {
+                if let index = entry.photos.firstIndex(of: photo) {
+                    if selectedPhoto == photo {
+                        selectedPhoto = nil
+                    }
+                    entry.photos.remove(at: index)
+                    modelContext.delete(photo)
+                    entry.updateStatusFromPhotos()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("Are you sure you want to delete this photo? This action cannot be undone.")
+        }
     }
     
     // MARK: - Section Views
@@ -154,27 +178,53 @@ struct EntryDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(entry.sortedPhotos) { photo in
-                            Button {
-                                selectedPhoto = photo
-                            } label: {
-                                if let uiImage = UIImage(data: photo.imageData) {
-                                    Image(uiImage: uiImage)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 55, height: 55)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .stroke(selectedPhoto == photo || (selectedPhoto == nil && photo == entry.sortedPhotos.first) ? Color.primary : Color.clear, lineWidth: 2)
-                                        )
-                                        .opacity(draggedPhoto == photo ? 0.5 : 1.0)
+                            ZStack(alignment: .topTrailing) {
+                                Button {
+                                    if !isJiggling {
+                                        selectedPhoto = photo
+                                    }
+                                } label: {
+                                    if let uiImage = UIImage(data: photo.imageData) {
+                                        Image(uiImage: uiImage)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 55, height: 55)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(selectedPhoto == photo || (selectedPhoto == nil && photo == entry.sortedPhotos.first) ? Color.primary : Color.clear, lineWidth: 2)
+                                            )
+                                            .opacity(draggedPhoto == photo ? 0.5 : 1.0)
+                                    }
+                                }
+                                .jiggle(isActive: isJiggling)
+                                .onDrag {
+                                    self.draggedPhoto = photo
+                                    return NSItemProvider(object: photo.id.uuidString as NSString)
+                                }
+                                .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: movePhotos))
+                                .simultaneousGesture(
+                                    LongPressGesture(minimumDuration: 0.5)
+                                        .onEnded { _ in
+                                            withAnimation {
+                                                isJiggling = true
+                                            }
+                                        }
+                                )
+                                
+                                if isJiggling {
+                                    Button {
+                                        photoToDelete = photo
+                                        showingPhotoDeleteConfirmation = true
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(.white, .red)
+                                            .font(.caption)
+                                    }
+                                    .padding(-4)
+                                    .transition(.scale.combined(with: .opacity))
                                 }
                             }
-                            .onDrag {
-                                self.draggedPhoto = photo
-                                return NSItemProvider(object: photo.id.uuidString as NSString)
-                            }
-                            .onDrop(of: [.text], delegate: PhotoDropDelegate(item: photo, photos: entry.sortedPhotos, draggedItem: $draggedPhoto, onMove: movePhotos))
                         }
                         
                         Button {
