@@ -177,6 +177,7 @@ struct EntryFormView: View {
             .padding(.bottom, 40)
         }
         .scrollDismissesKeyboard(.immediately)
+        .background(Color.appBackground)
         .contentShape(Rectangle())
         .onTapGesture {
             if isJiggling {
