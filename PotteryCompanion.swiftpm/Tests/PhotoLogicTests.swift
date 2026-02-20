@@ -1,5 +1,5 @@
 import XCTest
-@testable import AppModule
+@testable import PotteryCompanion
 
 final class PhotoLogicTests: XCTestCase {
     func testUpdateStatusFromPhotos() {

@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AppModule
+@testable import PotteryCompanion
 
 final class PotteryModelTests: XCTestCase {
     var container: ModelContainer!
