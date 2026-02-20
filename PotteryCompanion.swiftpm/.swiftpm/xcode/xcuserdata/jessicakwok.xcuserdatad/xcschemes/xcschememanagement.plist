@@ -17,6 +17,11 @@
 	</dict>
 	<key>SuppressBuildableAutocreation</key>
 	<dict>
+		<key>AppModuleTests</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
 		<key>Pottery Album</key>
 		<dict>
 			<key>primary</key>

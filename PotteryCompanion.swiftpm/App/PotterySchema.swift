@@ -8,6 +8,7 @@ enum PotteryStage: String, CaseIterable, Codable, Comparable {
     case bisque = "Bisque"
     case glazed = "Glazed"
     case finished = "Finished"
+    case stopped = "Stopped"
     
     static func < (lhs: PotteryStage, rhs: PotteryStage) -> Bool {
         let allCases = self.allCases
@@ -35,7 +36,7 @@ final class PotteryEntry {
     // Dimensions
     // Shape
     var shape: String
-    var status: String // "In Progress", "Completed", "Stopped"
+    var status: String // E.g., PotteryStage.greenware.rawValue (In Progress), Finished, Stopped
     
     @Relationship(deleteRule: .cascade) var photos: [PotteryPhoto] = []
     

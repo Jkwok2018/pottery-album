@@ -24,8 +24,9 @@ final class PotteryModelTests: XCTestCase {
     func testPotteryStageComparison() {
         XCTAssertTrue(PotteryStage.greenware < PotteryStage.trimmed)
         XCTAssertTrue(PotteryStage.bisque < PotteryStage.finished)
-        XCTAssertFalse(PotteryStage.finished < PotteryStage.greenware)
-        XCTAssertEqual(PotteryStage.allCases.count, 5)
+        XCTAssertTrue(PotteryStage.finished < PotteryStage.stopped)
+        XCTAssertFalse(PotteryStage.stopped < PotteryStage.greenware)
+        XCTAssertEqual(PotteryStage.allCases.count, 6)
     }
     
     func testDynamicSelectionLogic() {

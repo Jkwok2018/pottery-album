@@ -25,6 +25,12 @@ final class PhotoLogicTests: XCTestCase {
         entry.photos.append(photo3)
         entry.updateStatusFromPhotos()
         XCTAssertEqual(entry.status, PotteryStage.finished.rawValue)
+        
+        // Add a Stopped photo (Stopped is higher than Finished in our enum order now)
+        let photo4 = PotteryPhoto(imageData: Data(), stageTag: PotteryStage.stopped.rawValue)
+        entry.photos.append(photo4)
+        entry.updateStatusFromPhotos()
+        XCTAssertEqual(entry.status, PotteryStage.stopped.rawValue)
     }
     
     func testPhotoOrderIndexSorting() {

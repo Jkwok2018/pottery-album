@@ -40,7 +40,14 @@ struct ContentView: View {
         
         // 5. Filter by Status
         if let status = filterConfig.selectedStatus {
-            result = result.filter { $0.status == status }
+            if status == "In Progress" {
+                result = result.filter { 
+                    $0.status != PotteryStage.finished.rawValue && 
+                    $0.status != PotteryStage.stopped.rawValue 
+                }
+            } else {
+                result = result.filter { $0.status == status }
+            }
         }
         
         return result
@@ -169,8 +176,8 @@ struct FilterSheet: View {
                 Picker("Status", selection: $config.selectedStatus) {
                     Text("Any").tag(Optional<String>.none)
                     Text("In Progress").tag(Optional("In Progress"))
-                    Text("Completed").tag(Optional("Completed"))
-                    Text("Stopped").tag(Optional("Stopped"))
+                    Text("Finished").tag(Optional(PotteryStage.finished.rawValue))
+                    Text("Stopped").tag(Optional(PotteryStage.stopped.rawValue))
                 }
                 .pickerStyle(.menu)
 
@@ -292,6 +299,7 @@ struct PotteryCardView: View {
         case .bisque: return .brown
         case .glazed: return .purple
         case .finished: return .blue
+        case .stopped: return .gray
         }
     }
 }
