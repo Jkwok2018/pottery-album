@@ -607,7 +607,7 @@ struct EntryFormView: View {
             let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
             
-            let request = UNNotificationRequest(identifier: "\(entry.id.uuidString)-trim", content: content, trigger: trigger)
+            let _ = UNNotificationRequest(identifier: "\(entry.id.uuidString)-trim", content: content, trigger: trigger)
         }
     }
     
@@ -623,4 +623,8 @@ struct EntryFormView: View {
     private func moveTemporaryPhotos(from source: IndexSet, to destination: Int) {
         temporaryPhotos.move(fromOffsets: source, toOffset: destination)
     }
+}
+
+#Preview {
+    ContentView()
 }

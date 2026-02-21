@@ -518,3 +518,7 @@ private struct GalleryThumbnail: View {
         .onTapGesture(perform: onAction)
     }
 }
+
+#Preview {
+    ContentView()
+}

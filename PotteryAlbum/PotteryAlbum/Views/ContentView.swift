@@ -303,3 +303,7 @@ struct PotteryCardView: View {
         }
     }
 }
+
+#Preview {
+    ContentView()
+}
