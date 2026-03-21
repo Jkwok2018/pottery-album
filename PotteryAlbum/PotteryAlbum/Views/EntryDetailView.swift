@@ -14,7 +14,6 @@ struct EntryDetailView: View {
     @State private var newGlazeName = ""
     @State private var showingDeleteConfirmation = false
     @State private var draggedPhoto: PotteryPhoto?
-    @State private var showingAddPhotoOptions = false
     @State private var showingPhotosPicker = false
     @State private var photoToDelete: PotteryPhoto?
     @State private var showingPhotoDeleteConfirmation = false
@@ -216,8 +215,17 @@ struct EntryDetailView: View {
                             )
                         }
                         
-                        Button {
-                            showingAddPhotoOptions = true
+                        Menu {
+                            Button {
+                                showingCamera = true
+                            } label: {
+                                Label("Take Photo", systemImage: "camera")
+                            }
+                            Button {
+                                showingPhotosPicker = true
+                            } label: {
+                                Label("Choose from Library", systemImage: "photo.on.rectangle")
+                            }
                         } label: {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
@@ -227,15 +235,6 @@ struct EntryDetailView: View {
                                     .font(.title3)
                                     .foregroundStyle(.secondary)
                             }
-                        }
-                        .confirmationDialog("Add Photo", isPresented: $showingAddPhotoOptions) {
-                            Button("Take Photo") {
-                                showingCamera = true
-                            }
-                            Button("Choose from Library") {
-                                showingPhotosPicker = true
-                            }
-                            Button("Cancel", role: .cancel) { }
                         }
                     }
                     .padding(.horizontal, 4)
